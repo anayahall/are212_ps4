@@ -1,0 +1,23 @@
+CODEBOOK PS5.
+
+Table F5.1: Macroeconomics Data Set, Quarterly, 1950I to 2000IV, 204 Quarterly Observations 
+Source: Department of Commerce, BEA website and www.economagic.com 
+
+The variables are in the following order in the file ps5dat.txt
+
+Year   qtr  realgdp realcons realinvs realgovt realdpi cpi_u M1   tbilrate unemp  pop infl     realint
+
+Year = Date 
+Qtr = Quarter 
+Realgdp = Real GDP ($bil) 
+Realcons = Real consumption expenditures 
+Realinvs = Real investment by private sector 
+Realgovt = Real government expenditures 
+Realdpi = Real disposable personal income 
+CPI_U = Consumer price index 
+M1 = Nominal money stock 
+Tbilrate = Quarterly average of month end 90 day t bill rate 
+Unemp = Unemployment rate 
+Pop = Population, mil. interpolate of year end figures using constant growth rate per quarter 
+Infl = Rate of inflation (first observation is missing) 
+Realint = Ex post real interest rate = Tbilrate - Infl. (First observation missing) 
