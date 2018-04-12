@@ -1,0 +1,625 @@
+---
+title: "Problem Set #4"
+author: "Anaya Hall & Christian Miller"
+date: "Due April 25th"
+output: pdf_document
+fontsize: 11pt
+geometry: margin=.75in 
+---
+
+```{r setup, include=FALSE}
+
+rm(list = ls())
+# Setup
+knitr::opts_chunk$set(echo = TRUE, cache = F)
+# Options
+options(stringsAsFactors = F)
+# Packages
+library(pacman)
+p_load(knitr, kableExtra, tidyverse, dplyr, readr, magrittr, ggplot2, readxl, ascii, sandwich, tinytex)
+
+```
+
+# Wage Regressions - Blackburn and Neumark (QJE 1992)
+The goal of this problem set is to explore some **tests for heteroskedasticity** and explore **the fixes** discussed in class.
+
+
+## Question 1:
+**Read the data into R. Plot the series and make sure your data are read in correctly.**
+
+```{r read_data, message=FALSE}
+
+# Read in CSV as data.frame
+wage_df <- readr::read_csv("nls80.csv")
+
+# Select only the variables in our model
+wage_df %<>% select(lwage, wage, exper, tenure, married, south, urban, black, educ)
+```
+
+
+``` {r plot_series, message = FALSE}
+# Plot the variables in our model
+ggplot(data = gather(wage_df), aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~ key, scales = "free") +
+  ggtitle("Histograms of Wage Data variables") +
+  ylab("Count") +
+  xlab("Value") + theme_minimal()
+```
+
+So far, everthing looks good.
+
+## Question 2: Exploring Heteroskedasticity
+
+Model (1) :
+
+$log(wage) = \beta_0 + exper \cdot \beta_1 + tenure \cdot \beta_2 + married \cdot \beta_3 + south \cdot \beta_4 + urban \cdot \beta_5 + black \cdot \beta_6 + educ \cdot \beta_7 + \epsilon$
+
+### (a) Estimate model (1) via OLS
+
+First, load our OLS function created in Problem Sets 1 & 2.
+
+```{r OLS function}
+
+# Function to convert tibble, data.frame, or tbl_df to matrix
+to_matrix <- function(the_df, vars) {
+  # Create a matrix from variables in var
+  new_mat <- the_df %>%
+    #Select the columns given in 'vars'
+    select_(.dots = vars) %>%
+    # Convert to matrix
+    as.matrix()
+  # Return 'new_mat'
+  return(new_mat)
+}
+
+ols <- function(data, y_data, X_data, intercept = T, H0 = 0, two_tail = T, alpha = 0.05) {
+  # Function setup ----
+    # Require the 'dplyr' package
+    require(dplyr)
+  
+  # Create dependent and independent variable matrices ----
+    # y matrix
+    y <- to_matrix (the_df = data, vars = y_data)
+    # X matrix
+    X <- to_matrix (the_df = data, vars = X_data)
+      # If 'intercept' is TRUE, then add a column of ones
+      if (intercept == T) {
+      X <- cbind(1,X)
+      colnames(X) <- c("intercept", X_data)
+      }
+ 
+  # Calculate b, y_hat, and residuals ----
+    b <- solve(t(X) %*% X) %*% t(X) %*% y
+    y_hat <- X %*% b
+    e <- y - y_hat
+    
+  # Useful -----
+    n <- nrow(X) # number of observations
+    k <- ncol(X) # number of independent variables
+    dof <- n - k # degrees of freedom
+    i <- rep(1,n) # column of ones for demeaning matrix
+    A <- diag(i) - (1 / n) * i %*% t(i) # demeaning matrix
+    y_star <- A %*% y # for SST
+    X_star <- A %*% X # for SSM
+    SST <- drop(t(y_star) %*% y_star)
+    SSM <- drop(t(b) %*% t(X_star) %*% X_star %*% b)
+    SSR <- drop(t(e) %*% e)
+  
+  # Measures of fit and estimated variance ----
+    R2uc <- drop((t(y_hat) %*% y_hat)/(t(y) %*% y)) # Uncentered R^2
+    R2 <- 1 - SSR/SST # Uncentered R^2
+    R2adj <- 1 - (n-1)/dof * (1 - R2) # Adjusted R^2
+    AIC <- log(SSR/n) + 2*k/n # AIC
+    SIC <- log(SSR/n) + k/n*log(n) # SIC
+    s2 <- SSR/dof # s^2
+  
+  # Measures of fit table ----
+    mof_table_df <- data.frame(R2uc, R2, R2adj, SIC, AIC, SSR, s2)
+    mof_table_col_names <- c("$R^2_\\text{uc}$", "$R^2$",
+                             "$R^2_\\text{adj}$",
+                             "SIC", "AIC", "SSR", "$s^2$")
+    mof_table <-  mof_table_df %>% knitr::kable(
+      row.names = F,
+      col.names = mof_table_col_names,
+      format.args = list(scientific = F, digits = 4),
+      booktabs = T,
+      escape = F
+    )
+  
+  # t-test----
+    # Standard error
+    se <- as.vector(sqrt(s2 * diag(solve(t(X) %*% X))))
+    # Vector of _t_ statistics
+    t_stats <- (b - H0) / se
+    # Calculate the p-values
+    if (two_tail == T) {
+    p_values <- pt(q = abs(t_stats), df = dof, lower.tail = F) * 2
+    } else {
+      p_values <- pt(q = abs(t_stats), df = dof, lower.tail = F)
+    }
+    # Do we (fail to) reject?
+    reject <- ifelse(p_values < alpha, reject <- "Reject", reject <- "Fail to Reject")
+    
+    # Nice table (data.frame) of results
+    ttest_df <- data.frame(
+      # The rows have the coef. names
+      effect = rownames(b),
+      # Estimated coefficients
+      coef = as.vector(b) %>% round(3),
+      # Standard errors
+      std_error = as.vector(se) %>% round(4),
+      # t statistics
+      t_stat = as.vector(t_stats) %>% round(3),
+      # p-values
+      p_value = as.vector(p_values) %>% round(4),
+      # reject null?
+      significance = as.character(reject)
+      )
+  
+    ttest_table <-  ttest_df %>% knitr::kable(
+      col.names = c("", "Coef.", "S.E.", "t Stat", "p-Value", "Decision"),
+      booktabs = T,
+      format.args = list(scientific = F),
+      escape = F,
+      caption = "OLS Results"
+    )
+
+  # Data frame for exporting for y, y_hat, X, and e vectors ----
+    export_df <- data.frame(y, y_hat, e, X) %>% tbl_df()
+    colnames(export_df) <- c("y","y_hat","e",colnames(X))
+  
+  # Return ----
+    return(list(n=n, dof=dof, b=b, vars=export_df, R2uc=R2uc,R2=R2,
+                R2adj=R2adj, AIC=AIC, SIC=SIC, s2=s2, SST=SST, SSR=SSR,
+                mof_table=mof_table, ttest=ttest_table))
+}
+```
+\newpage
+
+```{r model1}
+model_1 <- ols(wage_df, y_data = "lwage", 
+               X_data = c("exper", "tenure", "married", "south", "urban", "black", "educ"))
+
+model_1$ttest
+
+```
+
+### (b) Conduct a White test for heteroskedastic errors. 
+**Use levels, interactions and second order terms only. Do we have a problem?**
+
+_White's Test:_
+Regress the squared residuals ($e^2_i$) on a constant, all variables in *$X$*, squares of all variables in *$X$* and all cross products. $n \dot R^2$ from this regression is distributed as a $\chi^2_{(p-1)}$, where p is the number of regressors in this equation including the constant. The null in this test is homoskedastic disturbances.
+
+
+``` {r white_test_fxn, include = F}
+
+white_test <- function(resid, cov_mat){
+  
+  cov_mat %<>% as.matrix()
+  
+  # Interaction matrix
+  cov_n <- nrow(cov_mat)
+  cov_k <- sum(seq(ncol(cov_mat)))
+  int_mat <- matrix(NA, nrow = cov_n, ncol = cov_k)
+  
+  # Loop through all columns to create interaction matrix
+  for (i in 1:ncol(cov_mat)) {
+    for (j in i:ncol(cov_mat)) {
+      if (i == 1) m <- j
+      if (i > 1) m <- sum(seq(ncol(cov_mat), 1, -1)[1:(i-1)]) + (j - i + 1)
+      int_mat[, m] <- cov_mat[, i] * cov_mat[, j]
+    }
+  }
+  
+  # Bind together with covariate matrix
+  cov_mat %<>% cbind(.,int_mat)
+  # Make sure unique (see documentation for MARGIN = 2)
+  cov_mat %<>% unique(MARGIN = 2)
+  # Add intercept (column of ones)
+  cov_mat %<>% cbind(1,.)
+
+  # Outcome var ('y') is squared residual
+  y_data <- resid^2
+  
+  # y-hat for residual regression = X*beta  
+  y_hat <- cov_mat %*% solve(t(cov_mat) %*% cov_mat) %*% t(cov_mat) %*% y_data 
+  
+  # Calculate SSM and SST for R^2
+  SSM <- sum((y_hat - mean(y_data))^2)
+  SST <- sum((y_data - mean(y_data))^2)
+  
+  # Calculate White test statistic = R^2 * n
+  test_stat <- SSM / SST * cov_n
+  # Calculate pvalue
+  pvalue <- 1 - pchisq(test_stat, df = (ncol(cov_mat)-1)) #dof is p-1 yes?
+  
+  
+  return(list(PValue = pvalue, TestStat = test_stat, dof=ncol(cov_mat)))
+  
+  # white test results
+  # whitetest_df <- data.frame()
+  # 
+  # 
+  # white_table <-  whitetest_df %>% knitr::kable(
+  #     booktabs = T,
+  #     format.args = list(scientific = F),
+  #     escape = F,
+  #     caption = "White Test")
+  
+}
+
+
+```
+
+
+
+```{r 2b}
+# Prep for white function
+resid <- model_1$vars$e
+cov_mat <- wage_df %>% select(exper, tenure, married, south, urban, black, educ)
+
+# Run White Test
+white_test(resid, cov_mat)
+```
+There is some evidence for heteroskedasticity (probabilty is 0.0535), though not significant at 5% significance level.
+
+
+### (c) Goldfeld - Quandt Test for heteroskedastic errors
+**Use the tenure variable, leaving out the 235 observations in the middle. Do we have a problem?**
+
+
+_Goldfeld-Quant Test:_
+
+Intuition: The disturbances for two distinct groups of observations vary.
+
+Process: Rank observations by x (variable of interest) and separate into groups of high and low variances. In this case we will remove the middle 235 observations (increasing the power of the test). For the two samples, run the least squares moel and record the residuals from each regression. Then calculate test statistic: $F_{[n_1-k, \space n_2-k]}= \frac{e_1^`e_1/(n_1-k)}{e_2^`e_2/(n_2-k)}$
+
+
+``` {r goldfeldquant_fxn}
+
+GQ_test <- function(e1, e2, k) {
+  n1 <- length(e1)
+  n2 <- length(e2)
+  
+  SSE1 <- (t(e1) %*% e1)/(n1-k)
+  SSE2 <- (t(e2) %*% e2)/(n2-k)
+  test_stat <- SSE1 / SSE2
+  
+  pvalue <- 1 - pf(test_stat, n1-k, n2-k)
+  
+  return(data.frame(
+    "Test Statistic" = test_stat,
+    "P-Value" = pvalue
+  ))
+}
+
+```
+
+```{r 2c}
+# Prep for test
+# Rank by tenure
+wage_df %<>% arrange(tenure)
+# Splitting the data, removing the middle 235 observations
+wage_df1 <- wage_df[1:350,]
+wage_df2 <- wage_df[586:935,]
+# Run two regressions saving their residuals
+gq_resid_1 <- ols(wage_df1, y_data = "lwage", 
+               X_data = c("exper", "tenure", "married", "south", "urban", "black", "educ"))$vars$e
+gq_resid_2 <- ols(wage_df2, y_data = "lwage", 
+               X_data = c("exper", "tenure", "married", "south", "urban", "black", "educ"))$vars$e
+
+# Run GQ Test
+GQ_test(gq_resid_1, gq_resid_2, k=7) %>% knitr::kable()
+
+```
+According to the Goldfeld-Quandt Test (by tenure), yes, we have a significant heteroskedasticity problem. (p-value is approaches zero!)
+
+### (d) Breusch-Pagan Test for heteroskedastic errors
+*Use all of the covariates as a simple linear combination. Do we have a problem?*
+
+```{r breushpagan_fxn}
+BP_test <- function(data, e, cov_mat) {
+  
+  df <- data
+  
+  n <- length(e)
+  
+  dep_var <- (n * e^2 / sum(e^2))
+  
+  bp_df <- data.frame(dep_var, cov_mat)
+  
+  bp_Xs <- names(bp_df[2:ncol(bp_df)])
+  # run ols & save residuals
+  bp_ols <- ols(bp_df, y = "dep_var", X = bp_Xs)
+  yhat <- bp_ols$vars$y_hat
+  
+  ESS <- sum((dep_var - yhat)^2)
+  
+  test_stat <- (1/2)*ESS
+  
+  pvalue <- 1 - pchisq(test_stat, df = nrow(cov_mat))
+  
+  return(data.frame(
+    "Test Statistic" = test_stat,
+    "P-Value" = pvalue
+  ))
+}
+
+```
+
+``` {r 2d, warnings=FALSE}
+# Prep for test
+# Create new df w/ new variables
+# I reworked the BP test function such that these are no longer used in the test, but they are used later in FGLS so keeping them here for now....
+num <- model_1$vars$e^2
+denom <- (t(model_1$vars$e) %*% model_1$vars$e)/nrow(wage_df) %>% as.numeric()
+wage_df %<>% mutate(bp_y = (num/denom)) %>% as.vector()
+
+# Run the regression with the new y variable
+bp_resid <- ols(wage_df, y_data = "bp_y",
+                X_data = c("exper", "tenure", "married", "south", "urban", "black", "educ"))$vars$e
+
+cov_mat <- wage_df %>% select(exper, tenure, married, south, urban, black, educ)
+
+e <- model_1$vars$e
+
+# Run GQ Test
+BP_test(wage_df, e, cov_mat) %>% knitr::kable(
+)
+
+
+```
+Again, very low p-value (and VERY high test statistic). This test further validates the results from our previous tests-- we likely have an heteroskedasticity problem!
+
+
+### (e) White Robust Standard Errors
+*Calculate the White robust standard errors. Comment on how they compare to the traditional OLS standard errors. Is this the right way to go about fixing the potential problem?*
+
+```{r Spherical varcov fxn}
+# Function for OLS coefficient estimates
+b_ols <- function(y, X) {
+  # Calculate beta hat
+  beta_hat <- solve(t(X) %*% X) %*% t(X) %*% y
+  # Return beta_hat
+  return(beta_hat)
+}
+
+# Function for OLS coef., SE, t-stat, and p-value
+vcov_ols <- function(data, y_var, X_vars, intercept = T) {
+  # Turn data into matrices
+  y <- to_matrix(data, y_var)
+  X <- to_matrix(data, X_vars)
+  # Add intercept
+  if (intercept == T) X <- cbind(1, X)
+  # Calculate n and k for degrees of freedom
+  n <- nrow(X)
+  k <- ncol(X)
+  # Estimate coefficients
+  b <- b_ols(y, X)
+  # Update names
+  if (intercept == T) rownames(b)[1] <- "Intercept"
+  # Calculate OLS residuals
+  e <- y - X %*% b
+  # Calculate s^2
+  s2 <- (t(e) %*% e) / (n-k)
+  s2 %<>% as.numeric()
+  # Inverse of X'X
+  XX_inv <- solve(t(X) %*% X)
+  # Return the results
+  return(as.numeric(s2) * XX_inv)
+}  
+```
+
+
+```{r Robust varcov fxn}
+vcov_white <- function(data, y_var, X_vars, intercept = T) {
+  # Turn data into matrices
+  y <- to_matrix(data, y_var)
+  X <- to_matrix(data, X_vars)
+  # Add intercept
+  if (intercept == T) X <- cbind(1, X)
+  # Calculate n and k for degrees of freedom
+  n <- nrow(X)
+  k <- ncol(X)
+  # Estimate coefficients
+  b <- b_ols(y, X)
+  # Update names
+  if (intercept == T) rownames(b)[1] <- "Intercept"
+  # Calculate OLS residuals
+  e <- y - X %*% b
+  # Inverse of X'X
+  XX_inv <- solve(t(X) %*% X)
+  # For each row, calculate x_i' x_i e_i^2; then sum
+  sigma_hat <- lapply(X = 1:n, FUN = function(i) {
+    # Define x_i
+    x_i <- matrix(as.vector(X[i,]), nrow = 1)
+    # Return x_i' x_i e_i^2
+    return(t(x_i) %*% x_i * e[i]^2)
+  }) %>% Reduce(f = "+", x = .)
+  # Return the results
+  return(XX_inv %*% sigma_hat %*% XX_inv)
+}
+```
+
+```{r Spherical Variance}
+# Comparing spherical variance
+ols_se <- vcov_ols(data = wage_df,
+  y_var = "lwage",
+  X_vars = c("exper", "tenure", "married", "south", "urban", "black", "educ")) %>%
+  diag() %>% sqrt()
+
+```
+
+```{r Whites_robust}
+# With White's robust
+white_se <- vcov_white(data = wage_df,
+  y_var = "lwage",
+  X_vars = c("exper", "tenure", "married", "south", "urban", "black", "educ")) %>%
+  diag() %>% sqrt()
+
+```
+
+```{r compare_se}
+
+se_df <- cbind(ols_se, white_se)
+
+row.names(se_df) = c("Intercept", "Experience", "Tenure", "Married", "South", "Urban", "Black", "Education")
+
+knitr::kable(se_df,
+  digits = c(4, 4),
+  col.names = c("OLS S.E.", "White S.E"),
+  escape = F,
+  row.names = T,
+  caption = "2E - Comparing SE",
+  booktabs = T
+  ) %>% print()
+```
+
+The heteroskedasitc robust standard errors are about the same as the traditional OLS standard error, though some have slightly increased. Perhaps there is a better way to address this issue.... for instance, FGLS!
+
+### (f) Two-step FGLS estimation procedure
+*Estimate the model using the two step FGLS estimation procedure outlined in class. Use all of the covariates in regression to estimate weights. *
+
+*Talk about the standard errors obtained from your method. And how they compare to the White standard errors.*
+
+
+_FGLS Procedure:_ 
+
+First  run a regression to estimate the (sigma squared) using the least squares residuals. Then,  use the estimated (sigma hat squared ) to weight the individual observations (including the intercept!) and run OLS again. 
+
+```{r 2SFGLS_fxn, echo = F}
+# Add e^2 from earlier to our dataframe
+wage_df3 <- wage_df
+
+#should I put some loop?
+model_3 <- ols(wage_df3, y_data = "lwage", 
+               X_data = c("exper", "tenure", "married", "south", "urban", "black", "educ"))
+
+
+wage_df3 %<>% mutate(e2 = model_3$vars$e^2)
+fgls_predict <- bp_resid <- ols(wage_df3, y_data = "e2", 
+               X_data = c("exper", "tenure", "married", "south", "urban", "black", "educ"))$vars$y_hat
+weights <- 1/sqrt(fgls_predict)
+
+#add intercept before weighting!
+wage_df3 <- wage_df3 %<>% cbind(1,.) * weights 
+colnames(wage_df3)[1] <- "intercept"
+
+# Re-estimate model
+
+ols_df <- ols(wage_df3, "lwage", c("intercept",colnames(cov_mat)), intercept = F) 
+ols_df$ttest
+# Print variances
+#vcov_ols(data = wage_df3,
+#   y_var = "lwage",
+#   X_vars = c("exper", "tenure", "married", "south", "urban", "black", "educ")) %>%
+#   diag() %>% sqrt() %>% knitr::kable(
+#     row.names = c("FGLS S.E.")
+#  )
+```
+
+Finally, smaller standard errors!!!
+
+
+```{r fglsfunctionattempt, include=F}
+# ATTEMPT TO MAKE A FUNCTION --- do not include!
+# fgls <- function(data, y_data, X_data) {
+#   
+#   y <- to_matrix(data, y_data)
+#   X <- to_matrix(data, X_data) %>% cbind(1,.)
+#   Z <- to_matrix(data, X_data) %>% cbind(1,.)
+#   
+#   # run first regression & save resid
+#   e <- ols(y, X)$vars$e
+#   
+#   w <- ols(e^2, Z)$vars$y_hat
+#   
+#   W <- (1/sqrt(w))
+#   
+#   X_tilde <- X %*% X
+#   y_tilde <- y %*% W
+#   
+#   fgls_df <- cbind(X_tilde, y_tilde)
+#   
+#   fgls_results <- ols(fgls_df, colnames(tilde)[1], colnames(tilde)[2:ncol(tilde)], intercept = F)
+#   
+#   return(fgls_results)
+# }
+# 
+# #run function on data
+# 
+# fgls(wage_df, wage_df$lwage, cov_mat)
+```
+
+## Question 3: The Delta Method
+
+### (a)
+
+Model #2:
+$log(wage) = \beta_0 + exper\cdot\beta_1 + tenure\cdot\beta_2 + married\cdot\beta_3 + south\cdot\beta_4 + urban\cdot\beta_5 + black\cdot\beta_6 + educ\cdot\beta_7 + \epsilon$
+
+Take the exponent of both side, which gives us:
+
+$wage = e^{\beta_0+exper\cdot\beta_1+tenure\cdot\beta_2+married\cdot\beta_3+south\cdot\beta_4+urban\cdot\beta_5+black\cdot\beta_6+educ\cdot\beta_7+\epsilon}$
+
+We can rework a bit, setting all the other uninteristing variables equal to some constant, say $Z$, and separting $\epsilon$.
+$wage = e^{married\cdot\beta_3+Z+\epsilon}=e^{\epsilon}e^{married\cdot\beta_3}e^Z$
+
+Taking the expectation of both sides conditional on the covariates:
+
+$E[wage|X]=E[e^{\epsilon}e^{married\cdot\beta_3}e^Z|X]$ and if $\epsilon$ is independent of all covariates we should get $=E[e^{\epsilon}|X]e^{married\cdot\beta_3}e^Z=E[e^{\epsilon}]e^{married\cdot\beta_3}e^Z$
+
+Where there can only be two states of married, you either aren’t or you are.... 1 or 0, giving you one or the other extreme, and ceteris paribus (holding all other covariates constant.:
+
+$E[wage|X\space \&\space married = 1] = E[e^{\epsilon}]e^{\beta_3}e^Z$ and
+$E[wage|X\space \&\space married = 0] = E[e^{\epsilon}]e^Z$
+
+If you take the difference of equations above and divide by the expected wage of an unmarried man and then multiply by 100, you get the percentage difference which results in our consistent estimator $\theta_1$.
+$\hat{\theta_1}=100\cdot \frac{E[wage|X\space \&\space married = 1]-E[wage|X\space \&\space married = 0]}{E[wage|X\space \&\space married = 0]}$
+
+$\hat{\theta_1}=100\cdot \frac{E[e^{\epsilon}]e^{\beta_3}e^Z-E[e^{\epsilon}]e^Z}{E[e^{\epsilon}]e^Z}=100 \cdot \frac{E[e^\epsilon]e^Z(e^{\beta_3}-1)}{E[e^\epsilon]e^Z}=100\cdot (e^{\beta_3}-1) \blacksquare$
+
+### (b)
+
+```{r}
+model_1$b
+# Remind ourselves of LC and its var-cov matrix
+lc <- 100 * (exp(model_1$b[4]) - 1)
+vcov1 <- vcov_ols(data = wage_df,
+  y_var = "lwage",
+  X_vars = c("exper", "tenure", "married", "south", "urban", "black", "educ"))
+# Define our derivative matrix
+deriv_mat <- matrix(c(0, 0, 0, 100 * exp(model_1$b[4]), 0, 0, 0, 0), nrow = 1)
+# Calculate the standard error of 'lc' via delta method
+lc_dm <- sqrt(deriv_mat %*% vcov1 %*% t(deriv_mat))
+
+lc
+lc_dm
+(t_stat <- lc/ lc_dm)
+```
+
+### (c)
+```{r comparetheta}
+
+# Define covariates (again)
+
+cov_mat <- c("exper", "tenure", "married", "south", "urban", "black", "educ") 
+
+# Rerun our OLS function
+ols_df <- ols(wage_df, "lwage", cov_mat)
+
+# Rerun the FGLS model
+fgls_df <- ols(wage_df3, "lwage", cov_mat)
+
+# Calculate both estimates@
+# The basic results
+delta_results <- data.frame(
+  method = c("OLS", "FGLS"),
+  coef = c(ols_df$b[4], fgls_df$b[4]),
+  theta = 100 * (exp(c(ols_df$b[4], fgls_df$b[4])) - 1),
+  se = sqrt(100 * exp(c(ols_df$b[4], fgls_df$b[4])) * c(ols_df$b[4], fgls_df$b[4])) ) 
+delta_results %>% knitr::kable(col.names = c("Est. Method", "Beta_3", "Est. Theta", "S.E."),
+  digits = c(4))
+```
+
