@@ -20,43 +20,58 @@ p_load(knitr, kableExtra, tidyverse, dplyr, readr, magrittr, ggplot2, readxl, as
 
 ```
 
-# Wage Regressions - Blackburn and Neumark (QJE 1992)
-The goal of this problem set is to explore some **tests for heteroskedasticity** and explore **the fixes** discussed in class.
+# Serial Correlation
+The goal of this problem set is to explore what happens when we have _serially correlated distrubances_.
 
 
 ## Question 1:
-**Read the data into R. Plot the series and make sure your data are read in correctly.**
+**Read the data into R. Plot the series against time and make sure your data are read in correctly.**
+Also, print out data as ascii file and compare the first and last row to make sure there's no funny business with how the data were read in. Check a few points in the middle too.
 
-```{r read_data, message=FALSE}
+```{r read_data, message = FALSE}
 
-# Read in CSV as data.frame
-wage_df <- readr::read_csv("nls80.csv")
+# Column names from codebook
+names <- c("Year", "Qtr", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint")
 
-# Select only the variables in our model
-wage_df %<>% select(lwage, wage, exper, tenure, married, south, urban, black, educ)
+# Read in txt file as data.frame using column names from codebook
+gdp_data <- readr::read_table2("data.txt",
+                             col_names = names) 
+
 ```
 
 
 ``` {r plot_series, message = FALSE}
-# Plot the variables in our model
-ggplot(data = gather(wage_df), aes(x = value)) +
-  geom_histogram() +
+#Plot the variables in our model against time
+ggplot(data = gather(gdp_data, key, value, -Year), aes(x = Year, y = value)) +
+  geom_line() +
   facet_wrap(~ key, scales = "free") +
-  ggtitle("Histograms of Wage Data variables") +
-  ylab("Count") +
-  xlab("Value") + theme_minimal()
+  ggtitle("GDP data variables over time") +
+  ylab("Value") +
+  xlab("Year") + theme_minimal()
 ```
+
+```{r check_ascii}
+
+
+```
+
 
 So far, everthing looks good.
 
-## Question 2: Exploring Heteroskedasticity
+## Question 2: Phillips Curve
+Estimate the estimations augmented Phillips Curve (see Greene p. 251)
 
-Model (1) :
+Equation:
 
-$log(wage) = \beta_0 + exper \cdot \beta_1 + tenure \cdot \beta_2 + married \cdot \beta_3 + south \cdot \beta_4 + urban \cdot \beta_5 + black \cdot \beta_6 + educ \cdot \beta_7 + \epsilon$
+$\Delta p_t - \Delta p_{t-1} = \beta_1 + \beta_2\cdot u_t + \epsilon_t$
 
-### (a) Estimate model (1) via OLS
+### (a) Generate dependent variable
+_Hint: Check the codebook; may need to drop one of our variables._
 
+
+
+
+### (b)
 First, load our OLS function created in Problem Sets 1 & 2.
 
 ```{r OLS function}
@@ -185,7 +200,7 @@ model_1$ttest
 
 ```
 
-### (b) Conduct a White test for heteroskedastic errors. 
+### (b22) Conduct a White test for heteroskedastic errors. 
 **Use levels, interactions and second order terms only. Do we have a problem?**
 
 _White's Test:_
@@ -622,4 +637,5 @@ delta_results <- data.frame(
 delta_results %>% knitr::kable(col.names = c("Est. Method", "Beta_3", "Est. Theta", "S.E."),
   digits = c(4))
 ```
+
 
