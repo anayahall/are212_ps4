@@ -41,6 +41,7 @@ gdp_data <- readr::read_table2("data.txt",
 
 
 ``` {r plot_series, message = FALSE}
+
 #Plot the variables in our model against time
 ggplot(data = gather(gdp_data, key, value, -Year), aes(x = Year, y = value)) +
   geom_line() +
@@ -48,15 +49,18 @@ ggplot(data = gather(gdp_data, key, value, -Year), aes(x = Year, y = value)) +
   ggtitle("GDP data variables over time") +
   ylab("Value") +
   xlab("Year") + theme_minimal()
+
 ```
 
 ```{r check_ascii}
 
+write.table(x = gdp_data, file = "test_ascii")
+
+# ascii(x = gdp_data, include.rownames = T)
 
 ```
-
-
 So far, everthing looks good.
+
 
 ## Question 2: Phillips Curve
 Estimate the estimations augmented Phillips Curve (see Greene p. 251)
@@ -68,17 +72,27 @@ $\Delta p_t - \Delta p_{t-1} = \beta_1 + \beta_2\cdot u_t + \epsilon_t$
 ### (a) Generate dependent variable
 _Hint: Check the codebook; may need to drop one of our variables._
 
+Need to drop the first row because the first observation for Infl is missing
+Phillip's curve regresses inflation (%) on unemployment (%)
+
+```{r prepare_data}
+
+# Generate Dependent Variable
+for (i in 1:nrow(gdp_data)) {
+                       if (i==1)
+                       gdp_data$delta_p[i] = NA
+                       else
+                         gdp_data$delta_p[i] = gdp_data$Infl[i] - gdp_data$Infl[i-1] }
+
+# Drop first observation (row)
+gdp_data <- gdp_data[-1,]
+
+```
 
 ### (b)
+Estimate relationship above. Report parameter estimates, standard errors, t-statistics and $R^2$.
 
-
-
-
-# -FUNCTIONS-
-
-Load our OLS function created in earlier Problem Sets
-
-##### OLS
+First, let's load our OLS function. 
 ```{r OLS function}
 
 # Function to convert tibble, data.frame, or tbl_df to matrix
@@ -194,17 +208,45 @@ ols <- function(data, y_data, X_data, intercept = T, H0 = 0, two_tail = T, alpha
                 R2adj=R2adj, AIC=AIC, SIC=SIC, s2=s2, SST=SST, SSR=SSR,
                 mof_table=mof_table, ttest=ttest_table))
 }
+
 ```
 \newpage
 
-```{r model1}
-model_1 <- ols(wage_df, y_data = "lwage", 
-               X_data = c("exper", "tenure", "married", "south", "urban", "black", "educ"))
+
+``` {r model_1}
+
+# What is the right model here??--- all covariates?
+covariates <- c("Year", "Qtr", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint")
+
+model_1 <- ols(gdp_data, 
+               y_data = "delta_p", 
+               X_data =c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))
 
 model_1$ttest
 
+model_1$mof_table
+
 ```
 
+
+### (c)
+Plot residuals against time
+
+```{r plot_resid}
+res <- model_1$vars$e
+
+plot(gdp_data$Year, res)
+
+```
+Looking at this plot, we likely have a POSITVE auto-correlation issue....
+
+
+### (d)
+
+
+
+**
+# -FUNCTIONS-
 
 ##### White's Test
 Regress the squared residuals ($e^2_i$) on a constant, all variables in *$X$*, squares of all variables in *$X$* and all cross products. $n \dot R^2$ from this regression is distributed as a $\chi^2_{(p-1)}$, where p is the number of regressors in this equation including the constant. The null in this test is homoskedastic disturbances.
