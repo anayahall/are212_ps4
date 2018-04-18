@@ -242,7 +242,78 @@ Looking at this plot, we likely have a POSITVE auto-correlation issue....
 
 
 ### (d)
+Use Breusch-Godfrey test to test for first order correlation
 
+Procedure
+1. Run OLS & save residuals
+2. Augment with column of lagged residuals --> X0 (fill in any NAs with zeros)
+3. Auxillary regression: regress residuals et on X0t
+4. Test Statistic:
+
+$LM = T \cdot R^2_0$
+
+
+``` {r include = FALSE}
+test <- subset(gdp_data, Year <= 1960)
+test <- select(test, Year, Unemp)
+
+
+lag_var <- "Unemp"
+test$shifted <- NA
+  for (i in 1:nrow(test)) {
+    if (i == 1) test$shifted[[i]] = 0
+    else 
+      test$shifted[[i]] = lag_var[i-1]}
+
+nrow(test)
+
+```
+
+```{r breusch-godfrey test}
+
+# shift <- function(data, lag_var, shift_by = -1) {
+#   
+#   data$shifted <- NA
+# 
+#   for (i in 1:nrow(data)) {
+#     if (i == 1) data$shifted[i] = 0
+#     else data$shifted[i] = data$lag_var[i-1]}
+# 
+#   
+# }
+
+# BGX_data <- select(gdp_data, c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))
+
+# First order only
+BGtest <- function(data, y_data, X_data, order = 1) {
+  y <- to_matrix(data, y_data)
+  X <- to_matrix(data, X_data)
+  Z <- to_matrix(data, X_data)
+  
+  # # Run OLS and save residuals
+  e0 <- ols(data, y_data, X_data)$vars$e
+  Z %<>% cbind(Z, e0)
+  Z <- cbind(Z, NA)
+
+  
+  # 
+  # # Lag!
+  #   for (i in 1:nrow(Z)) {
+  #   if (i == 1) 
+  #     Z$e_lag[i] = 0
+  #   else 
+  #     Z$lag[i] = Z$e_lag[i-1]
+  #   }
+  # 
+  return(head(Z))
+  
+}
+
+BGtest(data = gdp_data, y_data = "delta_p", X_data = c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))
+
+# ols(data = gdp_data, y_data = "delta_p", X_data = c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))
+
+```
 
 
 **
