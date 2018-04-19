@@ -253,34 +253,8 @@ Procedure
 $LM = T \cdot R^2_0$
 
 
-``` {r include = FALSE}
-test <- subset(gdp_data, Year <= 1960)
-test <- select(test, Year, Unemp)
-
-
-lag_var <- "Unemp"
-test$shifted <- NA
-  for (i in 1:nrow(test)) {
-    if (i == 1) test$shifted[[i]] = 0
-    else 
-      test$shifted[[i]] = lag_var[i-1]}
-
-nrow(test)
-
-```
-
 ```{r breusch-godfrey test}
 
-# shift <- function(data, lag_var, shift_by = -1) {
-#   
-#   data$shifted <- NA
-# 
-#   for (i in 1:nrow(data)) {
-#     if (i == 1) data$shifted[i] = 0
-#     else data$shifted[i] = data$lag_var[i-1]}
-# 
-#   
-# }
 
 # BGX_data <- select(gdp_data, c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))
 
@@ -290,26 +264,42 @@ BGtest <- function(data, y_data, X_data, order = 1) {
   X <- to_matrix(data, X_data)
   Z <- to_matrix(data, X_data)
   
-  # # Run OLS and save residuals
+  # Run OLS and save residuals to new covariate matrix
   e0 <- ols(data, y_data, X_data)$vars$e
   Z %<>% cbind(Z, e0)
-  Z <- cbind(Z, NA)
-
   
-  # 
-  # # Lag!
-  #   for (i in 1:nrow(Z)) {
-  #   if (i == 1) 
-  #     Z$e_lag[i] = 0
-  #   else 
-  #     Z$lag[i] = Z$e_lag[i-1]
-  #   }
-  # 
-  return(head(Z))
+  # Add column of for lagged residuals
+  Z <- cbind(Z, NA)
+  colnames(Z)[ncol(Z)] <- "e_lag"
+
+  # First, convert Z to dataframe for lagging operation
+  c <- as.data.frame(Z)
+  
+  # Create lagged residuals
+    for (i in 1:nrow(Z)) {
+    if (i == 1)
+      c$e_lag[[i]] = 0
+    else
+      c$e_lag[[i]] = c$e0[i-1]
+    }
+
+  # Back to matrix
+  
+  X0 <- as.matrix(c)
+  BP_df <- cbind(data[y_data], X0)
+  BP_mat <- to_matrix(BP_df, colnames(BP_df))
+  
+  
+  # Regress
+  R2_stat <- ols(BP_mat, y_data, X_data = names(X0))$R2
+  
+  
+  
+  return(head(BP_mat))
   
 }
 
-BGtest(data = gdp_data, y_data = "delta_p", X_data = c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))
+t <- BGtest(data = gdp_data, y_data = "delta_p", X_data = c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))
 
 # ols(data = gdp_data, y_data = "delta_p", X_data = c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))
 
