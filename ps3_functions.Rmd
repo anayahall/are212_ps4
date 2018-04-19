@@ -1,0 +1,250 @@
+---
+title: "Untitled"
+author: "Anaya Hall"
+date: "4/19/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+**
+# -FUNCTIONS-
+
+##### White's Test
+Regress the squared residuals ($e^2_i$) on a constant, all variables in *$X$*, squares of all variables in *$X$* and all cross products. $n \dot R^2$ from this regression is distributed as a $\chi^2_{(p-1)}$, where p is the number of regressors in this equation including the constant. The null in this test is homoskedastic disturbances.
+
+
+``` {r white_test_fxn, include = F}
+
+white_test <- function(resid, cov_mat){
+  
+  cov_mat %<>% as.matrix()
+  
+  # Interaction matrix
+  cov_n <- nrow(cov_mat)
+  cov_k <- sum(seq(ncol(cov_mat)))
+  int_mat <- matrix(NA, nrow = cov_n, ncol = cov_k)
+  
+  # Loop through all columns to create interaction matrix
+  for (i in 1:ncol(cov_mat)) {
+    for (j in i:ncol(cov_mat)) {
+      if (i == 1) m <- j
+      if (i > 1) m <- sum(seq(ncol(cov_mat), 1, -1)[1:(i-1)]) + (j - i + 1)
+      int_mat[, m] <- cov_mat[, i] * cov_mat[, j]
+    }
+  }
+  
+  # Bind together with covariate matrix
+  cov_mat %<>% cbind(.,int_mat)
+  # Make sure unique (see documentation for MARGIN = 2)
+  cov_mat %<>% unique(MARGIN = 2)
+  # Add intercept (column of ones)
+  cov_mat %<>% cbind(1,.)
+
+  # Outcome var ('y') is squared residual
+  y_data <- resid^2
+  
+  # y-hat for residual regression = X*beta  
+  y_hat <- cov_mat %*% solve(t(cov_mat) %*% cov_mat) %*% t(cov_mat) %*% y_data 
+  
+  # Calculate SSM and SST for R^2
+  SSM <- sum((y_hat - mean(y_data))^2)
+  SST <- sum((y_data - mean(y_data))^2)
+  
+  # Calculate White test statistic = R^2 * n
+  test_stat <- SSM / SST * cov_n
+  # Calculate pvalue
+  pvalue <- 1 - pchisq(test_stat, df = (ncol(cov_mat)-1)) #dof is p-1 yes?
+  
+  
+  return(list(PValue = pvalue, TestStat = test_stat, dof=ncol(cov_mat)))
+  
+  # white test results
+  # whitetest_df <- data.frame()
+  # 
+  # 
+  # white_table <-  whitetest_df %>% knitr::kable(
+  #     booktabs = T,
+  #     format.args = list(scientific = F),
+  #     escape = F,
+  #     caption = "White Test")
+  
+}
+
+
+```
+
+
+
+##### Goldfeld-Quant Test:
+``` {r goldfeldquant_fxn}
+
+GQ_test <- function(e1, e2, k) {
+  n1 <- length(e1)
+  n2 <- length(e2)
+  
+  SSE1 <- (t(e1) %*% e1)/(n1-k)
+  SSE2 <- (t(e2) %*% e2)/(n2-k)
+  test_stat <- SSE1 / SSE2
+  
+  pvalue <- 1 - pf(test_stat, n1-k, n2-k)
+  
+  return(data.frame(
+    "Test Statistic" = test_stat,
+    "P-Value" = pvalue
+  ))
+}
+
+```
+
+```{r 2c, include = FALSE}
+# Prep for test
+# Rank by tenure
+wage_df %<>% arrange(tenure)
+# Splitting the data, removing the middle 235 observations
+wage_df1 <- wage_df[1:350,]
+wage_df2 <- wage_df[586:935,]
+# Run two regressions saving their residuals
+gq_resid_1 <- ols(wage_df1, y_data = "lwage", 
+               X_data = c("exper", "tenure", "married", "south", "urban", "black", "educ"))$vars$e
+gq_resid_2 <- ols(wage_df2, y_data = "lwage", 
+               X_data = c("exper", "tenure", "married", "south", "urban", "black", "educ"))$vars$e
+
+# Run GQ Test
+GQ_test(gq_resid_1, gq_resid_2, k=7) %>% knitr::kable()
+
+```
+
+##### Breusch-Pagan Test for heteroskedastic errors
+```{r breushpagan_fxn}
+BP_test <- function(data, e, cov_mat) {
+  
+  df <- data
+  
+  n <- length(e)
+  
+  dep_var <- (n * e^2 / sum(e^2))
+  
+  bp_df <- data.frame(dep_var, cov_mat)
+  
+  bp_Xs <- names(bp_df[2:ncol(bp_df)])
+  # run ols & save residuals
+  bp_ols <- ols(bp_df, y = "dep_var", X = bp_Xs)
+  yhat <- bp_ols$vars$y_hat
+  
+  ESS <- sum((dep_var - yhat)^2)
+  
+  test_stat <- (1/2)*ESS
+  
+  pvalue <- 1 - pchisq(test_stat, df = nrow(cov_mat))
+  
+  return(data.frame(
+    "Test Statistic" = test_stat,
+    "P-Value" = pvalue
+  ))
+}
+
+```
+
+
+##### White Robust Standard Errors
+```{r Spherical varcov fxn}
+# Function for OLS coefficient estimates
+b_ols <- function(y, X) {
+  # Calculate beta hat
+  beta_hat <- solve(t(X) %*% X) %*% t(X) %*% y
+  # Return beta_hat
+  return(beta_hat)
+}
+
+# Function for OLS coef., SE, t-stat, and p-value
+vcov_ols <- function(data, y_var, X_vars, intercept = T) {
+  # Turn data into matrices
+  y <- to_matrix(data, y_var)
+  X <- to_matrix(data, X_vars)
+  # Add intercept
+  if (intercept == T) X <- cbind(1, X)
+  # Calculate n and k for degrees of freedom
+  n <- nrow(X)
+  k <- ncol(X)
+  # Estimate coefficients
+  b <- b_ols(y, X)
+  # Update names
+  if (intercept == T) rownames(b)[1] <- "Intercept"
+  # Calculate OLS residuals
+  e <- y - X %*% b
+  # Calculate s^2
+  s2 <- (t(e) %*% e) / (n-k)
+  s2 %<>% as.numeric()
+  # Inverse of X'X
+  XX_inv <- solve(t(X) %*% X)
+  # Return the results
+  return(as.numeric(s2) * XX_inv)
+}  
+```
+
+```{r Robust varcov fxn}
+vcov_white <- function(data, y_var, X_vars, intercept = T) {
+  # Turn data into matrices
+  y <- to_matrix(data, y_var)
+  X <- to_matrix(data, X_vars)
+  # Add intercept
+  if (intercept == T) X <- cbind(1, X)
+  # Calculate n and k for degrees of freedom
+  n <- nrow(X)
+  k <- ncol(X)
+  # Estimate coefficients
+  b <- b_ols(y, X)
+  # Update names
+  if (intercept == T) rownames(b)[1] <- "Intercept"
+  # Calculate OLS residuals
+  e <- y - X %*% b
+  # Inverse of X'X
+  XX_inv <- solve(t(X) %*% X)
+  # For each row, calculate x_i' x_i e_i^2; then sum
+  sigma_hat <- lapply(X = 1:n, FUN = function(i) {
+    # Define x_i
+    x_i <- matrix(as.vector(X[i,]), nrow = 1)
+    # Return x_i' x_i e_i^2
+    return(t(x_i) %*% x_i * e[i]^2)
+  }) %>% Reduce(f = "+", x = .)
+  # Return the results
+  return(XX_inv %*% sigma_hat %*% XX_inv)
+}
+```
+
+
+##### FGLS
+```{r fglsfunctionattempt, include=F}
+# ATTEMPT TO MAKE A FUNCTION --- do not include!
+# fgls <- function(data, y_data, X_data) {
+#   
+#   y <- to_matrix(data, y_data)
+#   X <- to_matrix(data, X_data) %>% cbind(1,.)
+#   Z <- to_matrix(data, X_data) %>% cbind(1,.)
+#   
+#   # run first regression & save resid
+#   e <- ols(y, X)$vars$e
+#   
+#   w <- ols(e^2, Z)$vars$y_hat
+#   
+#   W <- (1/sqrt(w))
+#   
+#   X_tilde <- X %*% X
+#   y_tilde <- y %*% W
+#   
+#   fgls_df <- cbind(X_tilde, y_tilde)
+#   
+#   fgls_results <- ols(fgls_df, colnames(tilde)[1], colnames(tilde)[2:ncol(tilde)], intercept = F)
+#   
+#   return(fgls_results)
+# }
+# 
+# #run function on data
+# 
+# fgls(wage_df, wage_df$lwage, cov_mat)
+```
+
