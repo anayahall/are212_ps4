@@ -354,7 +354,7 @@ BPtest <- function(data, y_data, X_data, order = 1) {
   lag_coef <- ols(BP_df, "e0", colnames(X0))$b[2]
   test_stat <- nrow(BP_df) * lag_coef^2
 
-  pvalue <- 1 - pchisq(test_stat, df = 1)
+  pvalue <- 1 - pchisq(test_stat, df = order)
     
   # return(lag_coef)  
   return(data_frame("Test Statistic" = test_stat,
@@ -379,11 +379,57 @@ $ d = \frac {\Sigma_{t=2} (e_t - e_{t-1})^2}{ \Sigma_{t=1} e^2_t} $
 
 ```{r durbin-watson test}
 
-DWtest <- function() {
+DWtest <- function(data, y_data, X_data) {
+   y <- to_matrix(data, y_data)
+  X <- to_matrix(data, X_data)
+  Z <- to_matrix(data, X_data)
   
+  # Run OLS and save residuals to new covariate matrix
+  e0 <- ols(data, y_data, X_data)$vars$e
+  Z <- cbind(Z, e0)
   
+  # Add column of for lagged residuals
+  Z <- cbind(NA, Z)
+  colnames(Z)[1] <- "e_lag"
+
+  # First, convert Z to dataframe for lagging operation
+  c <- as.data.frame(Z)
+  
+  # Create lagged residuals
+    for (i in 1:nrow(Z)) {
+    if (i == 1)
+      c$e_lag[[i]] = 0
+    else
+      c$e_lag[[i]] = c$e0[i-1]
+    }
+
+  # # Back to matrix
+  # X0 <- c[-ncol(c)] %>% as.matrix()
+  # # BG_df <- cbind(data[y_data], X0)
+  # DW_df <- c
+  # 
+  # # Regress e on lagged variables, save coefficient on e_lag
+  # lag_coef <- ols(DW_df, "e0", colnames(X0))$b[2]
+  
+  # numerator summing from t=2
+  c1 <- c[-1,]
+  d_numer <- sum((c1$e0 - c1$e_lag)^2) 
+  d_denom <- sum((c$e0)^2)
+  
+  # Test statistic
+  d <- d_numer/d_denom
+  
+  return("Test Statistic" = d)
   
 }
 
+DWtest(data = gdp_data, y_data = "delta_p", X_data = c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint")) %>% knitr::kable()
+
 
 ```
+
+
+### (g)
+
+
+
