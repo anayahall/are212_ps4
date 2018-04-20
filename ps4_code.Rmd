@@ -93,7 +93,7 @@ gdp_data <- gdp_data[-1,]
 Estimate relationship above. Report parameter estimates, standard errors, t-statistics and $R^2$.
 
 First, let's load our OLS function. 
-```{r OLS function}
+```{r OLS functions}
 
 # Function to convert tibble, data.frame, or tbl_df to matrix
 to_matrix <- function(the_df, vars) {
@@ -105,6 +105,14 @@ to_matrix <- function(the_df, vars) {
     as.matrix()
   # Return 'new_mat'
   return(new_mat)
+}
+
+
+b_ols <- function(y, X) {
+  # Calculate beta hat
+  beta_hat <- solve(t(X) %*% X) %*% t(X) %*% y
+  # Return beta_hat
+  return(beta_hat)
 }
 
 ols <- function(data, y_data, X_data, intercept = T, H0 = 0, two_tail = T, alpha = 0.05) {
@@ -429,7 +437,75 @@ DWtest(data = gdp_data, y_data = "delta_p", X_data = c("Year", "Realgdp", "Realc
 ```
 
 
-### (g)
+### (g) Prais Winsten
+Use the Prais Winsten procedure to correct for the serial correlation problem. Report parameter estimates, standard errors, and t-statistics. Plot new residuals against time.
+
+Instead of $\hat\rho$ use $\hat\rho \frac{T-k}{T-1}$ in FLGS
+
+Load FGLS function from Problem Set #3
+```{r FGLS function}
+
+fgls <- function(data, y_var, X_vars, Z_vars, intercept = T) {
+  # Turn data into matrices
+  y <- to_matrix(data, y_var)
+  X <- to_matrix(data, X_vars)
+  Z <- to_matrix(data, Z_vars)
+  # Add intercept
+  if (intercept == T) X <- cbind(1, X)
+  if (intercept == T) Z <- cbind(1, Z)
+  # Calculate n and k for degrees of freedom
+  n <- nrow(X)
+  k <- ncol(X)
+  # Estimate coefficients
+  b <- b_ols(y, X)
+  # Update names
+  if (intercept == T) rownames(b)[1] <- "Intercept"
+  # Calculate OLS residuals
+  e <- y - X %*% b
+  # Regress the squared residuals on Z
+  a <- b_ols(e^2, Z)
+  # Calculate weights
+  w <- Z %*% a
+  C <- diag(as.vector(1 / sqrt(w)))
+  # Re-weight y and X
+  y_tilde <- C %*% y
+  X_tilde <- C %*% X
+  # Combine the transformed data and run OLS on them
+  colnames(X_tilde)[1] <- "Intercept"
+  tilde <- cbind(y_tilde, X_tilde) %>% data.frame()
+  
+  results <- ols(
+    data = tilde,
+    y_data =  colnames(tilde)[1],
+    X_data  = colnames(tilde)[2:ncol(tilde)],
+    intercept = F)
+  # Return the results
+  
+  return(results)
+}
+
+
+# # Define covariates (again)
+# rhs_vars <- c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint")
+# 
+# # Run the FGLS function
+# fgls(
+#   data = gdp_data,
+#   y_var = "delta_p",
+#   X_vars = rhs_vars,
+#   Z_vars = rhs_vars,
+#   intercept = T)
+
+```
+
+
+``` {r prais-winsten test}
 
 
 
+```
+
+###### Notes on Parallelizing
+library(parallel)
+res <- mclapply(query, GET, mc.cores = 4)
+map_df(res, function)
