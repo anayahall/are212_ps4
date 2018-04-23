@@ -483,7 +483,51 @@ fgls <- function(data, y_var, X_vars, Z_vars, intercept = T) {
   
   return(results)
 }
+```
 
+```{r prais-winsten test}
+
+fgls_sc <- function(data, y_var, X_vars, Z_vars, intercept = T, estimator = "prais") {
+  # Turn data into matrices
+  y <- to_matrix(data, y_var)
+  X <- to_matrix(data, X_vars)
+  Z <- to_matrix(data, Z_vars)
+  # Add intercept
+  if (intercept == T) X <- cbind(1, X)
+  if (intercept == T) Z <- cbind(1, Z)
+  # Calculate n and k for degrees of freedom
+  n <- nrow(X)
+  k <- ncol(X)
+  # Estimate coefficients
+  b <- b_ols(y, X)
+  # Update names
+  if (intercept == T) rownames(b)[1] <- "Intercept"
+  # Calculate OLS residuals
+  e <- y - X %*% b
+  # Regress the squared residuals on Z
+  a <- b_ols(e^2, Z)
+  # Calculate weights
+  w <- Z %*% a
+ 
+  C <- diag(as.vector(1 / sqrt(w)))
+   
+   
+  # Re-weight y and X
+  y_tilde <- C %*% y
+  X_tilde <- C %*% X
+  # Combine the transformed data and run OLS on them
+  colnames(X_tilde)[1] <- "Intercept"
+  tilde <- cbind(y_tilde, X_tilde) %>% data.frame()
+  
+  results <- ols(
+    data = tilde,
+    y_data =  colnames(tilde)[1],
+    X_data  = colnames(tilde)[2:ncol(tilde)],
+    intercept = F)
+  # Return the results
+  
+  return(results)
+}
 
 # # Define covariates (again)
 # rhs_vars <- c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint")
