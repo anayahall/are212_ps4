@@ -54,7 +54,7 @@ ggplot(data = gather(gdp_data, key, value, -Year), aes(x = Year, y = value)) +
 
 ```{r check_ascii}
 
-write.table(x = gdp_data, file = "test_ascii")
+write.table(x = gdp_data, file = "data_ascii")
 
 # ascii(x = gdp_data, include.rownames = T)
 
