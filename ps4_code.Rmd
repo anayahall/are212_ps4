@@ -249,7 +249,7 @@ res <- model_1$vars$e
 ggplot(gdp_data, aes(x=Year, y=res)) + geom_line()
 
 ```
-Looking at this plot, we likely have a **POSITVE** auto-correlation issue....
+Looking at this plot, we likely have a **NEGATIVE** auto-correlation issue....
 
 
 ### (d) Breusch-Godfrey
