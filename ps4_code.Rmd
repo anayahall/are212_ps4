@@ -246,7 +246,7 @@ model_1$mof_table
 ```{r plot_resid}
 res <- model_1$vars$e
 
-plot(gdp_data$Year, res)
+ggplot(gdp_data, aes(x=Year, y=res)) + geom_line()
 
 ```
 Looking at this plot, we likely have a **POSITVE** auto-correlation issue....
