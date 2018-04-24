@@ -222,6 +222,9 @@ missing Phillip's curve regresses inflation (\%) on unemployment (\%)
 \begin{Highlighting}[]
 \CommentTok{# Drop first observation (row)}
 \NormalTok{gdp_data <-}\StringTok{ }\NormalTok{gdp_data[}\OperatorTok{-}\DecValTok{1}\NormalTok{,]}
+
+\CommentTok{# SHOULD I CONCATENATE YEAR and QUARTER? That way I don't have to drop quarter!}
+\NormalTok{gdp_data }\OperatorTok{%<>%}\StringTok{  }\KeywordTok{transform}\NormalTok{(}\DataTypeTok{yr_qtr =} \KeywordTok{paste}\NormalTok{(Year, Qtr, }\DataTypeTok{sep=}\StringTok{"."}\NormalTok{))}
 \end{Highlighting}
 \end{Shaded}
 
@@ -364,7 +367,7 @@ First, let's load our OLS function.
 \begin{Highlighting}[]
 \CommentTok{# What is the right model here??--- all covariates?}
 \NormalTok{## I dropped }
-\NormalTok{covariates <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\StringTok{"Year"}\NormalTok{, }\StringTok{"Qtr"}\NormalTok{, }\StringTok{"Realgdp"}\NormalTok{, }\StringTok{"Realcons"}\NormalTok{, }\StringTok{"Realinvs"}\NormalTok{, }\StringTok{"Realgovt"}\NormalTok{, }\StringTok{"Realdpi"}\NormalTok{, }\StringTok{"CPI_U"}\NormalTok{, }\StringTok{"M1"}\NormalTok{, }\StringTok{"Tbilrate"}\NormalTok{, }\StringTok{"Unemp"}\NormalTok{, }\StringTok{"Pop"}\NormalTok{, }\StringTok{"Infl"}\NormalTok{, }\StringTok{"Realint"}\NormalTok{)}
+\NormalTok{covariates <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\StringTok{"yr_qtr"}\NormalTok{, }\StringTok{"Realgdp"}\NormalTok{, }\StringTok{"Realcons"}\NormalTok{, }\StringTok{"Realinvs"}\NormalTok{, }\StringTok{"Realgovt"}\NormalTok{, }\StringTok{"Realdpi"}\NormalTok{, }\StringTok{"CPI_U"}\NormalTok{, }\StringTok{"M1"}\NormalTok{, }\StringTok{"Tbilrate"}\NormalTok{, }\StringTok{"Unemp"}\NormalTok{, }\StringTok{"Pop"}\NormalTok{, }\StringTok{"Infl"}\NormalTok{, }\StringTok{"Realint"}\NormalTok{)}
 
 \NormalTok{model_}\DecValTok{1}\NormalTok{ <-}\StringTok{ }\KeywordTok{ols}\NormalTok{(gdp_data, }
                \DataTypeTok{y_data =} \StringTok{"delta_p"}\NormalTok{, }
@@ -435,7 +438,8 @@ time}\label{c-plot-residuals-against-time}
 \end{Shaded}
 
 \includegraphics{ps4_code_files/figure-latex/plot_resid-1.pdf} Looking
-at this plot, we likely have a POSITVE auto-correlation issue\ldots{}.
+at this plot, we likely have a \textbf{POSITVE} auto-correlation
+issue\ldots{}.
 
 \subsubsection{(d) Breusch-Godfrey}\label{d-breusch-godfrey}
 
@@ -484,7 +488,8 @@ Null hypothesis is no serial correlation
 \NormalTok{  BG_df <-}\StringTok{ }\NormalTok{c}
 
   \CommentTok{# Regress}
-\NormalTok{  R2_stat <-}\StringTok{ }\KeywordTok{ols}\NormalTok{(BG_df, }\StringTok{"e0"}\NormalTok{, }\KeywordTok{colnames}\NormalTok{(X0))}\OperatorTok{$}\NormalTok{R2}
+  \CommentTok{# Not regressing on all lhs vars (colnames(X0)), just e_lag}
+\NormalTok{  R2_stat <-}\StringTok{ }\KeywordTok{ols}\NormalTok{(BG_df, }\StringTok{"e0"}\NormalTok{, }\StringTok{"e_lag"}\NormalTok{)}\OperatorTok{$}\NormalTok{R2}
 \NormalTok{  test_stat <-}\StringTok{ }\NormalTok{R2_stat}\OperatorTok{*}\KeywordTok{nrow}\NormalTok{(data)}
   
 \NormalTok{  pvalue <-}\StringTok{ }\DecValTok{1} \OperatorTok{-}\StringTok{ }\KeywordTok{pchisq}\NormalTok{(test_stat, }\DataTypeTok{df =} \DecValTok{1}\NormalTok{)}
@@ -503,7 +508,7 @@ Null hypothesis is no serial correlation
 Test Statistic & P-Value\tabularnewline
 \midrule
 \endhead
-0.3518258 & 0.5530814\tabularnewline
+0.3367482 & 0.5617123\tabularnewline
 \bottomrule
 \end{longtable}
 
@@ -560,7 +565,8 @@ where \(\hat\rho^2_j\) are the OLS coefficients from a regression of
 \NormalTok{  BP_df <-}\StringTok{ }\NormalTok{c}
 
   \CommentTok{# Regress e on lagged variables, save coefficient on e_lag}
-\NormalTok{  lag_coef <-}\StringTok{ }\KeywordTok{ols}\NormalTok{(BP_df, }\StringTok{"e0"}\NormalTok{, }\KeywordTok{colnames}\NormalTok{(X0))}\OperatorTok{$}\NormalTok{b[}\DecValTok{2}\NormalTok{]}
+  \CommentTok{# Not regressing on all lhs vars (colnames(X0)), just e_lag}
+\NormalTok{  lag_coef <-}\StringTok{ }\KeywordTok{ols}\NormalTok{(BP_df, }\StringTok{"e0"}\NormalTok{, }\StringTok{"e_lag"}\NormalTok{)}\OperatorTok{$}\NormalTok{b[}\DecValTok{2}\NormalTok{]}
 \NormalTok{  test_stat <-}\StringTok{ }\KeywordTok{nrow}\NormalTok{(BP_df) }\OperatorTok{*}\StringTok{ }\NormalTok{lag_coef}\OperatorTok{^}\DecValTok{2}
 
 \NormalTok{  pvalue <-}\StringTok{ }\DecValTok{1} \OperatorTok{-}\StringTok{ }\KeywordTok{pchisq}\NormalTok{(test_stat, }\DataTypeTok{df =}\NormalTok{ order)}
@@ -580,7 +586,7 @@ where \(\hat\rho^2_j\) are the OLS coefficients from a regression of
 Test Statistic & P-Value\tabularnewline
 \midrule
 \endhead
-0.3676114 & 0.5443092\tabularnewline
+0.3367783 & 0.5616948\tabularnewline
 \bottomrule
 \end{longtable}
 
@@ -657,7 +663,8 @@ x\tabularnewline
 \bottomrule
 \end{longtable}
 
-\subsubsection{(g) Prais Winsten}\label{g-prais-winsten}
+\subsubsection{(g) Prais Winsten
+procedure}\label{g-prais-winsten-procedure}
 
 Use the Prais Winsten procedure to correct for the serial correlation
 problem. Report parameter estimates, standard errors, and t-statistics.
@@ -707,20 +714,270 @@ Load FGLS function from Problem Set \#3
   
   \KeywordTok{return}\NormalTok{(results)}
 \NormalTok{\}}
-
-
-\CommentTok{# # Define covariates (again)}
-\CommentTok{# rhs_vars <- c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint")}
-\CommentTok{# }
-\CommentTok{# # Run the FGLS function}
-\CommentTok{# fgls(}
-\CommentTok{#   data = gdp_data,}
-\CommentTok{#   y_var = "delta_p",}
-\CommentTok{#   X_vars = rhs_vars,}
-\CommentTok{#   Z_vars = rhs_vars,}
-\CommentTok{#   intercept = T)}
 \end{Highlighting}
 \end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{rho_ols <-}\StringTok{ }\ControlFlowTok{function}\NormalTok{(data, y_data, X_data, }\DataTypeTok{order =} \DecValTok{1}\NormalTok{) \{}
+\NormalTok{  y <-}\StringTok{ }\KeywordTok{to_matrix}\NormalTok{(data, y_data)}
+\NormalTok{  X <-}\StringTok{ }\KeywordTok{to_matrix}\NormalTok{(data, X_data)}
+\NormalTok{  Z <-}\StringTok{ }\KeywordTok{to_matrix}\NormalTok{(data, X_data)}
+  
+  \CommentTok{# Run OLS and save residuals to new covariate matrix}
+\NormalTok{  e0 <-}\StringTok{ }\KeywordTok{ols}\NormalTok{(data, y_data, X_data)}\OperatorTok{$}\NormalTok{vars}\OperatorTok{$}\NormalTok{e}
+\NormalTok{  Z <-}\StringTok{ }\KeywordTok{cbind}\NormalTok{(Z, e0)}
+  
+  \CommentTok{# Add column of for lagged residuals}
+\NormalTok{  Z <-}\StringTok{ }\KeywordTok{cbind}\NormalTok{(}\OtherTok{NA}\NormalTok{, Z)}
+  \KeywordTok{colnames}\NormalTok{(Z)[}\DecValTok{1}\NormalTok{] <-}\StringTok{ "e_lag"}
+
+  \CommentTok{# First, convert Z to dataframe for lagging operation}
+\NormalTok{  c <-}\StringTok{ }\KeywordTok{as.data.frame}\NormalTok{(Z)}
+  
+  \CommentTok{# Create lagged residuals}
+    \ControlFlowTok{for}\NormalTok{ (i }\ControlFlowTok{in} \DecValTok{1}\OperatorTok{:}\KeywordTok{nrow}\NormalTok{(Z)) \{}
+    \ControlFlowTok{if}\NormalTok{ (i }\OperatorTok{==}\StringTok{ }\DecValTok{1}\NormalTok{)}
+\NormalTok{      c}\OperatorTok{$}\NormalTok{e_lag[[i]] =}\StringTok{ }\DecValTok{0}
+    \ControlFlowTok{else}
+\NormalTok{      c}\OperatorTok{$}\NormalTok{e_lag[[i]] =}\StringTok{ }\NormalTok{c}\OperatorTok{$}\NormalTok{e0[i}\OperatorTok{-}\DecValTok{1}\NormalTok{]}
+\NormalTok{    \}}
+
+  \CommentTok{# Back to matrix}
+\NormalTok{  X0 <-}\StringTok{ }\NormalTok{c[}\OperatorTok{-}\KeywordTok{ncol}\NormalTok{(c)] }\OperatorTok{%>%}\StringTok{ }\KeywordTok{as.matrix}\NormalTok{()}
+  \CommentTok{# BG_df <- cbind(data[y_data], X0)}
+\NormalTok{  lagged_df <-}\StringTok{ }\NormalTok{c}
+
+  \CommentTok{# Regress e on lagged variables, save coefficient on e_lag }
+  \CommentTok{# (this is index position 2, after the intercept)}
+\NormalTok{  rho_hat <-}\StringTok{ }\KeywordTok{ols}\NormalTok{(lagged_df, }\StringTok{"e0"}\NormalTok{, }\StringTok{"e_lag"}\NormalTok{)}\OperatorTok{$}\NormalTok{b[}\DecValTok{2}\NormalTok{]}
+  
+  \CommentTok{# Alternate way of calculating, gets the same value! }
+  \CommentTok{# c1 <- c[-1,]}
+  \CommentTok{# rho_numer <- sum((c1$e0 * c1$e_lag)) }
+  \CommentTok{# rho_denom <- sum((c$e0)^2)}
+  \CommentTok{# rho_1 <- rho_numer/rho_denom}
+  
+  \CommentTok{# return(lag_coef)  }
+  \KeywordTok{return}\NormalTok{(rho_hat)}
+  
+\NormalTok{\}}
+
+\CommentTok{# Check if function works}
+\CommentTok{# rho_ols(data = gdp_data, y_data = "delta_p", X_data = c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{fgls_sc <-}\StringTok{ }\ControlFlowTok{function}\NormalTok{(data, y_var, X_vars, Z_vars, }\DataTypeTok{intercept =}\NormalTok{ T, }\DataTypeTok{procedure =} \StringTok{"prais"}\NormalTok{) \{}
+  \CommentTok{# Turn data into matrices}
+\NormalTok{  y <-}\StringTok{ }\KeywordTok{to_matrix}\NormalTok{(data, y_var)}
+\NormalTok{  X <-}\StringTok{ }\KeywordTok{to_matrix}\NormalTok{(data, X_vars)}
+\NormalTok{  Z <-}\StringTok{ }\KeywordTok{to_matrix}\NormalTok{(data, Z_vars)}
+  \CommentTok{# Add intercept}
+  \ControlFlowTok{if}\NormalTok{ (intercept }\OperatorTok{==}\StringTok{ }\NormalTok{T) X <-}\StringTok{ }\KeywordTok{cbind}\NormalTok{(}\DecValTok{1}\NormalTok{, X)}
+  \ControlFlowTok{if}\NormalTok{ (intercept }\OperatorTok{==}\StringTok{ }\NormalTok{T) Z <-}\StringTok{ }\KeywordTok{cbind}\NormalTok{(}\DecValTok{1}\NormalTok{, Z)}
+  \CommentTok{# Calculate n and k for degrees of freedom}
+\NormalTok{  t <-}\StringTok{ }\KeywordTok{nrow}\NormalTok{(X)}
+\NormalTok{  k <-}\StringTok{ }\KeywordTok{ncol}\NormalTok{(X)}
+  \CommentTok{# Update names}
+  \CommentTok{#if (intercept == T) rownames(b)[1] <- "Intercept"}
+
+  \CommentTok{# ESTIMATE RHO}
+  \ControlFlowTok{if}\NormalTok{ (procedure }\OperatorTok{==}\StringTok{ "prais"}\NormalTok{)}
+\NormalTok{      sc_data <-}\StringTok{ }\NormalTok{data[}\OperatorTok{-}\DecValTok{1}\NormalTok{,]}
+  \ControlFlowTok{else} \ControlFlowTok{if}\NormalTok{ (procedure }\OperatorTok{==}\StringTok{ "cochrane"}\NormalTok{)}
+\NormalTok{      sc_data <-}\StringTok{ }\NormalTok{data}
+  
+  \CommentTok{# Estimate rho for use in FGLS}
+\NormalTok{  rho <-}\StringTok{ }\KeywordTok{rho_ols}\NormalTok{(sc_data, y_var, X_vars)}
+\NormalTok{  rho_hat <-}\StringTok{ }\NormalTok{rho }\OperatorTok{*}\StringTok{ }\NormalTok{(t}\OperatorTok{-}\NormalTok{k)}\OperatorTok{/}\NormalTok{(t}\OperatorTok{-}\DecValTok{1}\NormalTok{)}
+  
+  \CommentTok{# CREATE LOOP THAT BUILDS C MATRIX (is this the right number of rows/columns??)}
+\NormalTok{   G <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\OtherTok{NA}\NormalTok{, }\DataTypeTok{nrow=}\NormalTok{t, }\DataTypeTok{ncol =}\NormalTok{t)}
+    \ControlFlowTok{for}\NormalTok{ (i }\ControlFlowTok{in} \DecValTok{1}\OperatorTok{:}\NormalTok{t) \{}
+      \ControlFlowTok{for}\NormalTok{ (j }\ControlFlowTok{in} \DecValTok{1}\OperatorTok{:}\NormalTok{t) \{}
+        \ControlFlowTok{if}\NormalTok{ (j }\OperatorTok{==}\StringTok{ }\DecValTok{1} \OperatorTok{&}\StringTok{ }\NormalTok{i }\OperatorTok{==}\StringTok{ }\DecValTok{1}\NormalTok{) G[i,j] <-}\StringTok{ }\KeywordTok{sqrt}\NormalTok{(}\DecValTok{1}\OperatorTok{-}\NormalTok{rho)}
+        \ControlFlowTok{else} \ControlFlowTok{if}\NormalTok{ (i }\OperatorTok{==}\StringTok{ }\NormalTok{j) G[i,j] <-}\StringTok{ }\DecValTok{1}
+        \ControlFlowTok{else} \ControlFlowTok{if}\NormalTok{ (i }\OperatorTok{==}\StringTok{ }\NormalTok{j }\OperatorTok{+}\StringTok{ }\DecValTok{1}\NormalTok{) G[i,j] <-}\StringTok{ }\OperatorTok{-}\NormalTok{rho}
+        \ControlFlowTok{else}\NormalTok{ G[i,j] <-}\StringTok{ }\DecValTok{0}
+\NormalTok{      \}}
+\NormalTok{    \}}
+
+  \CommentTok{# Re-weight y and X}
+\NormalTok{  y_tilde <-}\StringTok{ }\NormalTok{G }\OperatorTok{%*%}\StringTok{ }\NormalTok{y}
+\NormalTok{  X_tilde <-}\StringTok{ }\NormalTok{G }\OperatorTok{%*%}\StringTok{ }\NormalTok{X}
+  
+  \CommentTok{# Combine the transformed data and run OLS on them}
+  \KeywordTok{colnames}\NormalTok{(X_tilde)[}\DecValTok{1}\NormalTok{] <-}\StringTok{ "Intercept"}
+\NormalTok{  tilde <-}\StringTok{ }\KeywordTok{cbind}\NormalTok{(y_tilde, X_tilde) }\OperatorTok{%>%}\StringTok{ }\KeywordTok{data.frame}\NormalTok{()}
+  
+\NormalTok{  results <-}\StringTok{ }\KeywordTok{ols}\NormalTok{(}
+    \DataTypeTok{data =}\NormalTok{ tilde,}
+    \DataTypeTok{y_data =}  \KeywordTok{colnames}\NormalTok{(tilde)[}\DecValTok{1}\NormalTok{],}
+    \DataTypeTok{X_data  =} \KeywordTok{colnames}\NormalTok{(tilde)[}\DecValTok{2}\OperatorTok{:}\KeywordTok{ncol}\NormalTok{(tilde)],}
+    \DataTypeTok{intercept =}\NormalTok{ F)}
+  \CommentTok{# Return the results}
+  
+  \KeywordTok{return}\NormalTok{(results)}
+\NormalTok{\}}
+
+\CommentTok{# Define covariates (again)}
+\NormalTok{rhs_vars <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\StringTok{"Year"}\NormalTok{, }\StringTok{"Realgdp"}\NormalTok{, }\StringTok{"Realcons"}\NormalTok{, }\StringTok{"Realinvs"}\NormalTok{, }\StringTok{"Realgovt"}\NormalTok{, }\StringTok{"Realdpi"}\NormalTok{, }\StringTok{"CPI_U"}\NormalTok{, }\StringTok{"M1"}\NormalTok{, }\StringTok{"Tbilrate"}\NormalTok{, }\StringTok{"Unemp"}\NormalTok{, }\StringTok{"Pop"}\NormalTok{, }\StringTok{"Infl"}\NormalTok{, }\StringTok{"Realint"}\NormalTok{)}
+
+\CommentTok{# Run the FGLS function}
+\NormalTok{prais <-}\StringTok{ }\KeywordTok{fgls_sc}\NormalTok{(}
+  \DataTypeTok{data =}\NormalTok{ gdp_data,}
+  \DataTypeTok{y_var =} \StringTok{"delta_p"}\NormalTok{,}
+  \DataTypeTok{X_vars =}\NormalTok{ rhs_vars,}
+  \DataTypeTok{Z_vars =}\NormalTok{ rhs_vars,}
+  \DataTypeTok{intercept =}\NormalTok{ T)}
+
+\CommentTok{# Report parameter values, standard errors and t-statistics}
+\NormalTok{prais}\OperatorTok{$}\NormalTok{ttest}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{longtable}[]{@{}lrrrrl@{}}
+\caption{OLS Results}\tabularnewline
+\toprule
+& Coef. & S.E. & t Stat & p-Value & Decision\tabularnewline
+\midrule
+\endfirsthead
+\toprule
+& Coef. & S.E. & t Stat & p-Value & Decision\tabularnewline
+\midrule
+\endhead
+Intercept & -1985.743 & 800.8960 & -2.479 & 0.0140 &
+Reject\tabularnewline
+Year & 1.032 & 0.4207 & 2.454 & 0.0150 & Reject\tabularnewline
+Realgdp & -0.021 & 0.0054 & -3.964 & 0.0001 & Reject\tabularnewline
+Realcons & 0.017 & 0.0063 & 2.674 & 0.0082 & Reject\tabularnewline
+Realinvs & 0.021 & 0.0051 & 4.115 & 0.0001 & Reject\tabularnewline
+Realgovt & 0.018 & 0.0057 & 3.154 & 0.0019 & Reject\tabularnewline
+Realdpi & -0.006 & 0.0040 & -1.514 & 0.1317 & Fail to
+Reject\tabularnewline
+CPI\_U & 0.037 & 0.0166 & 2.237 & 0.0265 & Reject\tabularnewline
+M1 & 0.002 & 0.0051 & 0.427 & 0.6697 & Fail to Reject\tabularnewline
+Tbilrate & 81.137 & 62.5787 & 1.297 & 0.1964 & Fail to
+Reject\tabularnewline
+Unemp & -0.332 & 0.3256 & -1.019 & 0.3095 & Fail to
+Reject\tabularnewline
+Pop & -0.119 & 0.1410 & -0.846 & 0.3986 & Fail to Reject\tabularnewline
+Infl & -80.896 & 62.5660 & -1.293 & 0.1976 & Fail to
+Reject\tabularnewline
+Realint & -81.592 & 62.5751 & -1.304 & 0.1939 & Fail to
+Reject\tabularnewline
+\bottomrule
+\end{longtable}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{newres <-}\StringTok{ }\NormalTok{prais}\OperatorTok{$}\NormalTok{vars}\OperatorTok{$}\NormalTok{e}
+\end{Highlighting}
+\end{Shaded}
+
+Most of the signs on the parameter estimates are the same, but the
+magnitude has changed. Some significance results have changed as well!
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{plot}\NormalTok{(gdp_data}\OperatorTok{$}\NormalTok{Year, newres)}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{ps4_code_files/figure-latex/plot PW results-1.pdf}
+
+\subsubsection{(h) Cochrane Orcutt
+procedure}\label{h-cochrane-orcutt-procedure}
+
+Use the Cochrane Orcutt procedure to correct for the serial correlation
+problem. Report parameter estimates, standard errors, t-statistics and a
+plot of the new residuals against time. \emph{Did dropping the initial
+observation change the results a lot?}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{# Adjust fgls_sc function above to include an option to omit first observation???}
+\CommentTok{# ---> I DON'T THINK I DID THIS RIGHT!! PLEASE CHECK :)}
+
+\CommentTok{# Define covariates (again)}
+\NormalTok{rhs_vars <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\StringTok{"Year"}\NormalTok{, }\StringTok{"Realgdp"}\NormalTok{, }\StringTok{"Realcons"}\NormalTok{, }\StringTok{"Realinvs"}\NormalTok{, }\StringTok{"Realgovt"}\NormalTok{, }\StringTok{"Realdpi"}\NormalTok{, }\StringTok{"CPI_U"}\NormalTok{, }\StringTok{"M1"}\NormalTok{, }\StringTok{"Tbilrate"}\NormalTok{, }\StringTok{"Unemp"}\NormalTok{, }\StringTok{"Pop"}\NormalTok{, }\StringTok{"Infl"}\NormalTok{, }\StringTok{"Realint"}\NormalTok{)}
+
+\CommentTok{# Run the FGLS function}
+\NormalTok{cochrane <-}\StringTok{ }\KeywordTok{fgls_sc}\NormalTok{(}
+  \DataTypeTok{data =}\NormalTok{ gdp_data,}
+  \DataTypeTok{y_var =} \StringTok{"delta_p"}\NormalTok{,}
+  \DataTypeTok{X_vars =}\NormalTok{ rhs_vars,}
+  \DataTypeTok{Z_vars =}\NormalTok{ rhs_vars,}
+  \DataTypeTok{procedure =} \StringTok{"cochrane"}\NormalTok{,}
+  \DataTypeTok{intercept =}\NormalTok{ T)}
+
+\CommentTok{# Report parameter values, standard errors and t-statistics}
+\NormalTok{cochrane}\OperatorTok{$}\NormalTok{ttest}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{longtable}[]{@{}lrrrrl@{}}
+\caption{OLS Results}\tabularnewline
+\toprule
+& Coef. & S.E. & t Stat & p-Value & Decision\tabularnewline
+\midrule
+\endfirsthead
+\toprule
+& Coef. & S.E. & t Stat & p-Value & Decision\tabularnewline
+\midrule
+\endhead
+Intercept & -1974.295 & 803.5099 & -2.457 & 0.0149 &
+Reject\tabularnewline
+Year & 1.026 & 0.4221 & 2.431 & 0.0160 & Reject\tabularnewline
+Realgdp & -0.022 & 0.0054 & -3.989 & 0.0001 & Reject\tabularnewline
+Realcons & 0.017 & 0.0064 & 2.693 & 0.0077 & Reject\tabularnewline
+Realinvs & 0.021 & 0.0051 & 4.133 & 0.0001 & Reject\tabularnewline
+Realgovt & 0.018 & 0.0057 & 3.193 & 0.0017 & Reject\tabularnewline
+Realdpi & -0.006 & 0.0040 & -1.509 & 0.1329 & Fail to
+Reject\tabularnewline
+CPI\_U & 0.038 & 0.0167 & 2.254 & 0.0254 & Reject\tabularnewline
+M1 & 0.002 & 0.0052 & 0.433 & 0.6658 & Fail to Reject\tabularnewline
+Tbilrate & 81.886 & 62.6206 & 1.308 & 0.1926 & Fail to
+Reject\tabularnewline
+Unemp & -0.331 & 0.3285 & -1.008 & 0.3146 & Fail to
+Reject\tabularnewline
+Pop & -0.116 & 0.1418 & -0.816 & 0.4155 & Fail to Reject\tabularnewline
+Infl & -81.637 & 62.6079 & -1.304 & 0.1938 & Fail to
+Reject\tabularnewline
+Realint & -82.345 & 62.6169 & -1.315 & 0.1901 & Fail to
+Reject\tabularnewline
+\bottomrule
+\end{longtable}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{newres2 <-}\StringTok{ }\NormalTok{cochrane}\OperatorTok{$}\NormalTok{vars}\OperatorTok{$}\NormalTok{e}
+
+\CommentTok{# Rerun FGLS}
+
+\CommentTok{# t-test table}
+\end{Highlighting}
+\end{Shaded}
+
+I don't think I dropped the first observation correctly, but at present
+it doesn't seem to have changed the results dramatically\ldots{}..
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{plot}\NormalTok{(gdp_data}\OperatorTok{$}\NormalTok{Year, newres2)}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{ps4_code_files/figure-latex/plot CO results-1.pdf}
+
+\subsubsection{(i) Hildreth Lu procedure}\label{i-hildreth-lu-procedure}
+
+Not started\ldots{}..
+
+?gridsearch
 
 Notes on Parallelizing
 

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.18 (TeX Live 2017) (preloaded format=pdflatex 2017.5.23)  20 APR 2018 10:24
+This is pdfTeX, Version 3.14159265-2.6-1.40.18 (TeX Live 2017) (preloaded format=pdflatex 2017.5.23)  23 APR 2018 19:32
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1170,138 +1170,138 @@ File: ts1lmtt.fd 2009/10/30 v1.6 Font defs for Latin Modern
 Package xcolor Warning: Incompatible color definition on input line 221.
 
 
-Package xcolor Warning: Incompatible color definition on input line 226.
+Package xcolor Warning: Incompatible color definition on input line 229.
 
 
-Package xcolor Warning: Incompatible color definition on input line 226.
+Package xcolor Warning: Incompatible color definition on input line 229.
 
 
-Package xcolor Warning: Incompatible color definition on input line 235.
+Package xcolor Warning: Incompatible color definition on input line 238.
 
 
-Package xcolor Warning: Incompatible color definition on input line 359.
+Package xcolor Warning: Incompatible color definition on input line 362.
 
 
-Package xcolor Warning: Incompatible color definition on input line 359.
+Package xcolor Warning: Incompatible color definition on input line 362.
 
 
-Package xcolor Warning: Incompatible color definition on input line 359.
+Package xcolor Warning: Incompatible color definition on input line 362.
 
 [3]
 
-Package xcolor Warning: Incompatible color definition on input line 359.
+Package xcolor Warning: Incompatible color definition on input line 362.
 
 
-Package xcolor Warning: Incompatible color definition on input line 359.
+Package xcolor Warning: Incompatible color definition on input line 362.
 
 
-Underfull \vbox (badness 10000) detected at line 359
+Underfull \vbox (badness 10000) detected at line 362
  []
 
 
-Underfull \vbox (badness 10000) detected at line 359
+Overfull \vbox (0.87288pt too high) detected at line 362
  []
 
 
-Package xcolor Warning: Incompatible color definition on input line 359.
+Package xcolor Warning: Incompatible color definition on input line 362.
 
 [4]
 
-Package xcolor Warning: Incompatible color definition on input line 359.
+Package xcolor Warning: Incompatible color definition on input line 362.
 
 
-Package xcolor Warning: Incompatible color definition on input line 359.
+Package xcolor Warning: Incompatible color definition on input line 362.
 
 [5]
 
-Package xcolor Warning: Incompatible color definition on input line 363.
+Package xcolor Warning: Incompatible color definition on input line 366.
 
 
-Package xcolor Warning: Incompatible color definition on input line 375.
+Package xcolor Warning: Incompatible color definition on input line 378.
 
 
-Package xcolor Warning: Incompatible color definition on input line 375.
-
-
-Package longtable Warning: Column widths have changed
-(longtable)                in table 1 on input line 408.
-
-
-Package xcolor Warning: Incompatible color definition on input line 410.
-
-
-Package xcolor Warning: Incompatible color definition on input line 414.
-
-
-Package xcolor Warning: Incompatible color definition on input line 414.
+Package xcolor Warning: Incompatible color definition on input line 378.
 
 
 Package longtable Warning: Column widths have changed
-(longtable)                in table 2 on input line 424.
+(longtable)                in table 1 on input line 411.
 
 
-Package xcolor Warning: Incompatible color definition on input line 429.
+Package xcolor Warning: Incompatible color definition on input line 413.
 
 
-Package xcolor Warning: Incompatible color definition on input line 435.
+Package xcolor Warning: Incompatible color definition on input line 417.
 
 
-Package xcolor Warning: Incompatible color definition on input line 435.
+Package xcolor Warning: Incompatible color definition on input line 417.
+
+
+Package longtable Warning: Column widths have changed
+(longtable)                in table 2 on input line 427.
+
+
+Package xcolor Warning: Incompatible color definition on input line 432.
+
+
+Package xcolor Warning: Incompatible color definition on input line 438.
+
+
+Package xcolor Warning: Incompatible color definition on input line 438.
 
 
 <ps4_code_files/figure-latex/plot_resid-1.pdf, id=55, 434.62375pt x 250.9375pt>
 File: ps4_code_files/figure-latex/plot_resid-1.pdf Graphic file (type pdf)
 <use ps4_code_files/figure-latex/plot_resid-1.pdf>
 Package pdftex.def Info: ps4_code_files/figure-latex/plot_resid-1.pdf used on i
-nput line 437.
+nput line 440.
 (pdftex.def)             Requested size: 434.64256pt x 250.94835pt.
 
-Underfull \hbox (badness 7030) in paragraph at lines 437--439
+Underfull \hbox (badness 7030) in paragraph at lines 440--443
 [][] \T1/lmr/m/n/10.95 (+20) Look-ing at
  []
 
 [6]
 
-Package xcolor Warning: Incompatible color definition on input line 452.
+Package xcolor Warning: Incompatible color definition on input line 456.
 
 
-Package xcolor Warning: Incompatible color definition on input line 499.
+Package xcolor Warning: Incompatible color definition on input line 504.
 
 
-Package xcolor Warning: Incompatible color definition on input line 499.
+Package xcolor Warning: Incompatible color definition on input line 504.
 
 
-Package xcolor Warning: Incompatible color definition on input line 499.
+Package xcolor Warning: Incompatible color definition on input line 504.
 
 [7 <./ps4_code_files/figure-latex/plot_resid-1.pdf>]
 
-Package xcolor Warning: Incompatible color definition on input line 499.
+Package xcolor Warning: Incompatible color definition on input line 504.
 
 
-Package xcolor Warning: Incompatible color definition on input line 499.
+Package xcolor Warning: Incompatible color definition on input line 504.
 
 
 Package longtable Warning: Column widths have changed
-(longtable)                in table 3 on input line 508.
+(longtable)                in table 3 on input line 513.
 
 
-Package xcolor Warning: Incompatible color definition on input line 510.
+Package xcolor Warning: Incompatible color definition on input line 515.
 
 
-Package xcolor Warning: Incompatible color definition on input line 514.
+Package xcolor Warning: Incompatible color definition on input line 519.
 
 
-Package xcolor Warning: Incompatible color definition on input line 514.
+Package xcolor Warning: Incompatible color definition on input line 519.
 
 ! Missing $ inserted.
 <inserted text> 
                 $
-l.524 Test-statistic: \$Q = T \Sigma
+l.529 Test-statistic: \$Q = T \Sigma
                                     \hat\rho\^{}2\_j \$ distributed 
 Here is how much of TeX's memory you used:
  14503 strings out of 492995
  209239 string characters out of 6132704
- 340286 words of memory out of 5000000
+ 340692 words of memory out of 5000000
  17787 multiletter control sequences out of 15000+600000
  55336 words of font info for 61 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191

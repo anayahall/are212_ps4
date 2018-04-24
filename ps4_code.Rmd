@@ -564,8 +564,8 @@ fgls_sc <- function(data, y_var, X_vars, Z_vars, intercept = T, procedure = "pra
       sc_data <- data
   
   # Estimate rho for use in FGLS
-  rho_raw <- rho_ols(sc_data, y_var, X_vars)
-  rho_hat <- rho_raw * (t-k)/(t-1)
+  rho <- rho_ols(sc_data, y_var, X_vars)
+  rho_hat <- rho * (t-k)/(t-1)
   
   # CREATE LOOP THAT BUILDS C MATRIX (is this the right number of rows/columns??)
    G <- matrix(NA, nrow=t, ncol =t)
