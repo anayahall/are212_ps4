@@ -76,16 +76,12 @@ Need to drop the first row because the first observation for Infl is missing
 Phillip's curve regresses inflation (%) on unemployment (%)
 
 ```{r prepare_data}
-
-# Generate Dependent Variable
-for (i in 1:nrow(gdp_data)) {
-                       if (i==1)
-                       gdp_data$delta_p[i] = NA
-                       else
-                         gdp_data$delta_p[i] = gdp_data$Infl[i] - gdp_data$Infl[i-1] }
-
 # Drop first observation (row)
 gdp_data <- gdp_data[-1,]
+
+# Generate Dependent Variable
+gdp_data %<>% mutate(delta_p = Infl - lag(Infl))
+gdp_data <- gdp_data[-1,] # to drop the first NA
 
 # SHOULD I CONCATENATE YEAR and QUARTER? That way I don't have to drop quarter!
 gdp_data %<>%  transform(yr_qtr = as.numeric(paste(Year, Qtr, sep=".")))
@@ -226,13 +222,9 @@ ols <- function(data, y_data, X_data, intercept = T, H0 = 0, two_tail = T, alpha
 
 ``` {r model_1}
 
-# What is the right model here??--- all covariates?
-## I dropped 
-covariates <- c("yr_qtr", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint")
-
 model_1 <- ols(gdp_data, 
                y_data = "delta_p", 
-               X_data =c("yr_qtr", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))
+               X_data = "Unemp")
 
 model_1$ttest
 
@@ -244,12 +236,12 @@ model_1$mof_table
 ### (c) Plot residuals against time
 
 ```{r plot_resid}
-res <- model_1$vars$e
+gdp_data$res <- model_1$vars$e
 
 ggplot(gdp_data, aes(x=Year, y=res)) + geom_line()
 
 ```
-Looking at this plot, we likely have a **NEGATIVE** auto-correlation issue....
+Looking at this plot, we likely have a **NEGATIVE** auto-correlation issue!
 
 
 ### (d) Breusch-Godfrey
@@ -263,24 +255,26 @@ Procedure
 
 $LM = T \cdot R^2_0$
 
-Null hypothesis is no serial correlation
+Null hypothesis is no serial correlation, or $H_0 : LM < \chi^2$ critical value. Our alternate hypothesis is first order serial correlation, or $H_A : LM > \chi^2$ critical value.
 
 ```{r breusch-godfrey test}
 
-
-# BGX_data <- select(gdp_data, c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))
 
 # First order only
 BGtest <- function(data, y_data, X_data, order = 1) {
   y <- to_matrix(data, y_data)
   X <- to_matrix(data, X_data)
-  Z <- to_matrix(data, X_data)
+  Z <- X #duplicate rhs matrix
   
   # Run OLS and save residuals to new covariate matrix
   e0 <- ols(data, y_data, X_data)$vars$e
+  # Generate 1 time period lagged residuals
+  e_lag <- lag(e0)
+  e_lag[is.na(e_lag)] <- 0 # Replace NA with zeros
+
   Z <- cbind(Z, e0)
   
-  # Add column of for lagged residuals
+  # Add column of lagged residuals
   Z <- cbind(NA, Z)
   colnames(Z)[1] <- "e_lag"
 
@@ -317,14 +311,14 @@ BGtest(data = gdp_data, y_data = "delta_p", X_data = c("yr_qtr", "Realgdp", "Rea
 # ols(data = gdp_data, y_data = "delta_p", X_data = c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))
 
 ```
-We cannot reject the null that there is no serial correlation (that is, we might have a problem with serial correlation!)
+We cannot reject the null that there is no serial correlation ~~~~~~(that is, we might have a problem with serial correlation!)~~~~~~~ contradictory 
 
 
 ### (e) Box-Pierce
 Use Box-Pierce test to test for first order correlation. Report test statistic and pvalue. 
 
 Test-statistic:
-$Q = T \Sigma\hat\rho^2_j $ 
+$Q = T \Sigma\hat\rho^2_j$ 
 distributed $\chi^2_p$
 
 where $\hat\rho^2_j$ are the OLS coefficients from a regression of $e_t$ on the $j^{th}$ lag (without an intercept!)
@@ -445,7 +439,7 @@ DWtest(data = gdp_data, y_data = "delta_p", X_data = c("yr_qtr", "Realgdp", "Rea
 ### (g) Prais Winsten procedure
 Use the Prais Winsten procedure to correct for the serial correlation problem. Report parameter estimates, standard errors, and t-statistics. Plot new residuals against time.
 
-Instead of $\hat\rho$ use $\hat\rho \frac{T-k}{T-1}$ in FLGS
+Instead of $\hat\rho$ use $\hat\rho \frac{T-k}{T-1}$ in FLGS.
 
 FGLS function from Problem Set #3
 ```{r FGLS function, include = FALSE}
@@ -685,9 +679,76 @@ ggplot(gdp_data, aes(x=Year, y=newres2)) + geom_line()
 ```
 
 ### (i) Hildreth Lu procedure
-Not started.....
 
-?gridsearch
+```{r Hildreth Lu, eval=F}
+
+rho <- 0.4
+data$one <- 1
+
+hildreth_lu <- function(data, y, X1, one, rho) {
+
+#Converting variables to vectors 
+y <- select_(data, y) %>% unlist()
+X1 <- select_(data, X1) %>% unlist()
+one <- select_(data, one) %>% unlist()
+
+#Modifying data based on rho
+y_lag <- lag(y)
+y_star <- y - rho * y_lag
+y_star[1] <- sqrt(1-rho^2) * y[1]
+
+
+X1_lag <- lag(X1)
+X1_star <- X1 - rho * X1_lag
+X1_star[1] <- sqrt(1-rho^2) * X1[1]
+
+
+X2_star <- one - rho
+X2_star[1] <- sqrt(1-rho^2)
+
+# Turn data into matrices
+  y <- cbind(y_star)
+  
+  X <- cbind(X1_star, X2_star)
+ 
+#Defining n and k 
+n <- nrow(X)
+k <- ncol(X) 
+  
+# Estimate coefficients
+  b <- b_ols(y, X)
+  
+# Calculate OLS residuals
+  e <- y - X %*% b
+# Calculate s^2
+  s2 <- (t(e) %*% e) / (n-k)
+  
+#Calculate Log likelihood function 
+  log_L <- -1*((t(e) %*% e)/ 2*s2) +0.5*log(1-rho^2) -n/2*(log(2*pi) + log(s2))
+  
+  (log_L)
+     
+  # Return the results
+  return(log_L)
+}
+
+#Testing for rho = 0.4 before running loop 
+hildreth_lu(data, "y", "unemployment", "one", rho)
+
+#Defining vector of rho's
+rhos <- seq(-0.95,0.95, by=0.01)
+
+#Running in a loop 
+(LL <- sapply(X = rhos,
+             FUN = hildreth_lu,
+             data = data, y = "y", X1 = "unemployment",
+             one = "one"))
+
+(rhos[which(LL==max(LL))])
+
+
+```
+
 
 
 
