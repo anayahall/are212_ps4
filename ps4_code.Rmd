@@ -16,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE, cache = T)
 options(stringsAsFactors = F)
 # Packages
 library(pacman)
-p_load(knitr, kableExtra, tidyverse, dplyr, readr, magrittr, ggplot2, readxl, ascii, sandwich, tinytex)
+p_load(knitr, kableExtra, tidyverse, dplyr, readr, magrittr, ggplot2, readxl, ascii, sandwich, tinytex, amsmath)
 
 ```
 
@@ -149,7 +149,7 @@ ols <- function(data, y_data, X_data, intercept = T, H0 = 0, two_tail = T, alpha
   
   # Measures of fit and estimated variance ----
     R2uc <- drop((t(y_hat) %*% y_hat)/(t(y) %*% y)) # Uncentered R^2
-    R2 <- 1 - SSR/SST # Uncentered R^2
+    R2 <- 1 - SSR/SST # Centered R^2
     R2adj <- 1 - (n-1)/dof * (1 - R2) # Adjusted R^2
     AIC <- log(SSR/n) + 2*k/n # AIC
     SIC <- log(SSR/n) + k/n*log(n) # SIC
@@ -265,64 +265,58 @@ BGtest <- function(data, y_data, X_data, order = 1) {
   y <- to_matrix(data, y_data)
   X <- to_matrix(data, X_data)
   Z <- X #duplicate rhs matrix
+  Z <- cbind(1,X) # adding a column of ones
+  colnames(Z)[1] <- "intercept"
   
   # Run OLS and save residuals to new covariate matrix
-  e0 <- ols(data, y_data, X_data)$vars$e
-  # Generate 1 time period lagged residuals
-  e_lag <- lag(e0)
+  e0 <- ols(data, y_data, X_data)$vars$e %>% as.matrix()
+  # Generate time period lagged residuals
+  e_lag <- as.data.frame(matrix(nrow = nrow(Z), ncol = order))
+  for (i in 1:order) {
+        e_lag[i] <- lag(e0,i)
+  }
   e_lag[is.na(e_lag)] <- 0 # Replace NA with zeros
+  Z %<>% cbind(e_lag) %>% as.matrix() # add to regressor matrix
 
-  Z <- cbind(Z, e0)
+
+  # Regress, Calculate b, y_hat, and residuals
+  b <- solve(t(Z) %*% Z) %*% t(Z) %*% e0
+  y_hat <- Z %*% b
+  resid <- e0 - y_hat
   
-  # Add column of lagged residuals
-  Z <- cbind(NA, Z)
-  colnames(Z)[1] <- "e_lag"
-
-  # First, convert Z to dataframe for lagging operation
-  c <- as.data.frame(Z)
+  # Calculate R^2
+  n <- nrow(Z) # number of observations
+  i <- rep(1,n) # column of ones for demeaning matrix
+  A <- diag(i) - (1 / n) * i %*% t(i) # demeaning matrix
+  y_star <- A %*% e0 # for SST
+  SST <- drop(t(y_star) %*% y_star)
+  SSR <- drop(t(resid) %*% resid)
+  R2 <- 1 - SSR/SST # Centered R^2
   
-  # Create lagged residuals
-    for (i in 1:nrow(Z)) {
-    if (i == 1)
-      c$e_lag[[i]] = 0
-    else
-      c$e_lag[[i]] = c$e0[i-1]
-    }
-
-  # Back to matrix
-  X0 <- c[-ncol(c)] %>% as.matrix()
-  # BG_df <- cbind(data[y_data], X0)
-  BG_df <- c
-
-  # Regress
-  # Not regressing on all lhs vars (colnames(X0)), just e_lag
-  R2_stat <- ols(BG_df, "e0", "e_lag")$R2
-  test_stat <- R2_stat*nrow(data)
+  LM_stat <- R2*(n-order)
   
-  pvalue <- 1 - pchisq(test_stat, df = 1)
+  pvalue <- 1 - pchisq(LM_stat, df = order)
     
-  return(data_frame("Test Statistic" = test_stat, 
+  return(data_frame("Test Statistic" = LM_stat, 
               "P-Value" = pvalue))
   
 }
 
-BGtest(data = gdp_data, y_data = "delta_p", X_data = c("yr_qtr", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint")) %>% knitr::kable()
-
-# ols(data = gdp_data, y_data = "delta_p", X_data = c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))
+(BGtest(data = gdp_data, y_data = "delta_p", X_data = "Unemp", order = 1))
 
 ```
-We cannot reject the null that there is no serial correlation ~~~~~~(that is, we might have a problem with serial correlation!)~~~~~~~ contradictory 
+Given that our test statistic is 36.41983 and p-value of $1.591*10^{-9}$, we reject the null hypothesis of no serial correlation.
 
 
 ### (e) Box-Pierce
-Use Box-Pierce test to test for first order correlation. Report test statistic and pvalue. 
+Use Box-Pierce test to test for first order correlation. Report test statistic and pvalue. Our null hypothesis is no auto correlation, or $H_0 : Q < \chi^2$ critical value. Our alternate hypothesis is first order auto correlation, or $H_A : Q > \chi^2$ critical value.
 
 Test-statistic:
-$Q = T \Sigma\hat\rho^2_j$ 
+$Q = T\cdot \Sigma \hat{\rho}^2_j$ 
 distributed $\chi^2_p$
 
-where $\hat\rho^2_j$ are the OLS coefficients from a regression of $e_t$ on the $j^{th}$ lag (without an intercept!)
-$\hat\rho^2_j = \frac {\Sigma_{t=j+1} e_t e_{t-j}}{\Sigma_{t=1} e^2_t}$
+where $\hat{\rho}^2_j$ are the OLS coefficients from a regression of $e_t$ on the $j^{th}$ lag (without an intercept!)
+$\hat{\rho}^2_j = \frac {\Sigma_{t=j+1} e_t e_{t-j}}{\Sigma_{t=1} e^2_t}$
 
 
 ```{r box-pierce test}
@@ -330,98 +324,63 @@ $\hat\rho^2_j = \frac {\Sigma_{t=j+1} e_t e_{t-j}}{\Sigma_{t=1} e^2_t}$
 BPtest <- function(data, y_data, X_data, order = 1) {
   y <- to_matrix(data, y_data)
   X <- to_matrix(data, X_data)
-  Z <- to_matrix(data, X_data)
   
   # Run OLS and save residuals to new covariate matrix
-  e0 <- ols(data, y_data, X_data)$vars$e
-  Z <- cbind(Z, e0)
+  e0 <- ols(data, y_data, X_data)$vars$e %>% as.matrix()
   
-  # Add column of for lagged residuals
-  Z <- cbind(NA, Z)
-  colnames(Z)[1] <- "e_lag"
-
-  # First, convert Z to dataframe for lagging operation
-  c <- as.data.frame(Z)
+  # Generate time period lagged residuals
+  e_lag <- data.frame(matrix(nrow = nrow(e0), ncol = order))
+  for (i in 1:order) {
+        e_lag[i] <- lag(e0,i)
+  }
+  e_lag[is.na(e_lag)] <- 0 # Replace NA with zeros
+  e_lag %<>% as.matrix
   
-  # Create lagged residuals
-    for (i in 1:nrow(Z)) {
-    if (i == 1)
-      c$e_lag[[i]] = 0
-    else
-      c$e_lag[[i]] = c$e0[i-1]
-    }
+  p = (t(e_lag) %*% e0) %*% solve((t(e0) %*% e0))
 
-  # Back to matrix
-  X0 <- c[-ncol(c)] %>% as.matrix()
-  # BG_df <- cbind(data[y_data], X0)
-  BP_df <- c
+  Q_stat <- nrow(e0) * sum(p^2)
 
-  # Regress e on lagged variables, save coefficient on e_lag
-  # Not regressing on all lhs vars (colnames(X0)), just e_lag
-  lag_coef <- ols(BP_df, "e0", "e_lag")$b[2]
-  test_stat <- nrow(BP_df) * lag_coef^2
-
-  pvalue <- 1 - pchisq(test_stat, df = order)
+  pvalue <- 1 - pchisq(Q_stat, df = order)
     
   # return(lag_coef)  
-  return(data_frame("Test Statistic" = test_stat,
+  return(data_frame("Test Statistic" = Q_stat,
               "P-Value" = pvalue))
   
   }
 
-BPtest(data = gdp_data, y_data = "delta_p", X_data = c("yr_qtr", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint")) %>% knitr::kable()
+(BPtest(data = gdp_data, y_data = "delta_p", X_data = "Unemp"))
 
 ```
 
-_(I'm not sure this is correct.....)_
 
-Again, we fail to reject the null- we likely have an issue with serial correlation!!
+We have a test statistic of 36.43994 and p-value of $1.575*10^{-9}$, and again, we reject the null hypothesis that there is no autocorrelation!
 
 ### (f) Durbin Watson
-Use the Durbin Watson test to test for first order autocorrelation. Report test statistic and interpret.
+Use the Durbin Watson test to test for first order autocorrelation. Report test statistic and interpret. Our null hypothesis is no auto correlation, or $H_0 : d > 2$ or $d > 1.779$ at 95 percent confidence level. Our alternate hypothesis is first order positive auto correlation, or $H_A : d < 2$  or $d < 1.758$at 95 percent confidence level.
 
 Test statistic:
+$d = \frac{\Sigma_{t=2}(e_t - e_{t-1})^2}{ \Sigma_{t=1}e^2_t}$
 
-$ d = \frac {\Sigma_{t=2} (e_t - e_{t-1})^2}{ \Sigma_{t=1} e^2_t} $
 
 ```{r durbin-watson test}
 
 DWtest <- function(data, y_data, X_data) {
-   y <- to_matrix(data, y_data)
+  require(stats)
+  y <- to_matrix(data, y_data)
   X <- to_matrix(data, X_data)
   Z <- to_matrix(data, X_data)
   
   # Run OLS and save residuals to new covariate matrix
-  e0 <- ols(data, y_data, X_data)$vars$e
-  Z <- cbind(Z, e0)
+  e0 <- ols(data, y_data, X_data)$vars$e %>% as.matrix()
   
-  # Add column of for lagged residuals
-  Z <- cbind(NA, Z)
-  colnames(Z)[1] <- "e_lag"
-
-  # First, convert Z to dataframe for lagging operation
-  c <- as.data.frame(Z)
   
-  # Create lagged residuals
-    for (i in 1:nrow(Z)) {
-    if (i == 1)
-      c$e_lag[[i]] = 0
-    else
-      c$e_lag[[i]] = c$e0[i-1]
-    }
-
-  # # Back to matrix
-  # X0 <- c[-ncol(c)] %>% as.matrix()
-  # # BG_df <- cbind(data[y_data], X0)
-  # DW_df <- c
-  # 
-  # # Regress e on lagged variables, save coefficient on e_lag
-  # lag_coef <- ols(DW_df, "e0", colnames(X0))$b[2]
+  # Generate time period lagged residuals
+  e_lag <- lag(e0)
+  e_lag[is.na(e_lag)] <- 0 # Replace NA with zeros
   
   # numerator summing from t=2
-  c1 <- c[-1,]
-  d_numer <- sum((c1$e0 - c1$e_lag)^2) 
-  d_denom <- sum((c$e0)^2)
+  d_numer <- sum((e0[2:nrow(e0),] - e_lag[2:nrow(e_lag),])^2) 
+  d_denom <- sum((e0)^2)
   
   # Test statistic
   d <- d_numer/d_denom
@@ -430,16 +389,16 @@ DWtest <- function(data, y_data, X_data) {
   
 }
 
-DWtest(data = gdp_data, y_data = "delta_p", X_data = c("yr_qtr", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint")) %>% knitr::kable()
+(DWtest(data = gdp_data, y_data = "delta_p", X_data = "Unemp"))
 
 
 ```
-
+Given our test statistic of 2.828, we reject the null hypothesis of no auto correlation. Since our test statistic is greater than 2, we want to also test the null hypothesis of no serial correlation versus negative serial correlation. Using 4-d (1.172) as the test statistic, we cannot reject the null that there is no serial correlation.
 
 ### (g) Prais Winsten procedure
 Use the Prais Winsten procedure to correct for the serial correlation problem. Report parameter estimates, standard errors, and t-statistics. Plot new residuals against time.
 
-Instead of $\hat\rho$ use $\hat\rho \frac{T-k}{T-1}$ in FLGS.
+Instead of $\hat{\rho}$ use $\hat{\rho} \frac{T-k}{T-1}$ in FLGS.
 
 FGLS function from Problem Set #3
 ```{r FGLS function, include = FALSE}
@@ -484,92 +443,74 @@ fgls <- function(data, y_var, X_vars, Z_vars, intercept = T) {
 }
 ```
 
-Function to return $\hat\rho$ estimator (for use in Prais Winsten and Cochrane Orcutt procedures)
+Function to return $\hat{\rho}$ estimator (for use in Prais Winsten and Cochrane Orcutt procedures)
 
 ``` {r rho_estimator}
 rho_ols <- function(data, y_data, X_data, order = 1) {
   y <- to_matrix(data, y_data)
   X <- to_matrix(data, X_data)
-  Z <- to_matrix(data, X_data)
   
   # Run OLS and save residuals to new covariate matrix
-  e0 <- ols(data, y_data, X_data)$vars$e
-  Z <- cbind(Z, e0)
-  
-  # Add column of for lagged residuals
-  Z <- cbind(NA, Z)
-  colnames(Z)[1] <- "e_lag"
+  e0 <- ols(data, y_data, X_data)$vars$e %>% as.matrix()
+  # Generate time period lagged residuals
+  e_lag <- as.data.frame(matrix(nrow = nrow(X), ncol = order))
+  for (i in 1:order) {
+        e_lag[i] <- lag(e0,i)
+  }
+  e_lag[is.na(e_lag)] <- 0 # Replace NA with zeros
+  e_lag <- cbind(rep(1,nrow(e_lag)),e_lag)
+  e_lag %<>% as.matrix()
 
-  # First, convert Z to dataframe for lagging operation
-  c <- as.data.frame(Z)
-  
-  # Create lagged residuals
-    for (i in 1:nrow(Z)) {
-    if (i == 1)
-      c$e_lag[[i]] = 0
-    else
-      c$e_lag[[i]] = c$e0[i-1]
-    }
-
-  # Back to matrix
-  X0 <- c[-ncol(c)] %>% as.matrix()
-  # BG_df <- cbind(data[y_data], X0)
-  lagged_df <- c
-
-  # Regress e on lagged variables, save coefficient on e_lag 
-  # (this is index position 2, after the intercept)
-  rho_hat <- ols(lagged_df, "e0", "e_lag")$b[2]
-  
-  # Alternate way of calculating, gets the same value! 
-  # c1 <- c[-1,]
-  # rho_numer <- sum((c1$e0 * c1$e_lag)) 
-  # rho_denom <- sum((c$e0)^2)
-  # rho_1 <- rho_numer/rho_denom
-  
+  # Regress, Calculate b, y_hat, and residuals
+  b <- solve(t(e_lag) %*% e_lag) %*% t(e_lag) %*% e0
+  rho_hat <- b[2]
   # return(lag_coef)  
   return(rho_hat)
   
 }
 
 # Check if function works
-# rho_ols(data = gdp_data, y_data = "delta_p", X_data = c("Year", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint"))
+# (rho_ols(data = gdp_data, y_data = "delta_p", X_data = "Unemp"))
 ```
 
 
 ```{r prais-winsten test}
 
 fgls_sc <- function(data, y_var, X_vars, Z_vars, intercept = T, procedure = "prais") {
-  # Turn data into matrices
-  y <- to_matrix(data, y_var)
-  X <- to_matrix(data, X_vars)
-  Z <- to_matrix(data, Z_vars)
+  # Which procedure
+  if (procedure == "prais") {
+      sc_data <- data
+      # Turn data into matrices
+      y <- to_matrix(sc_data, y_var)
+      X <- to_matrix(sc_data, X_vars)
+      Z <- to_matrix(sc_data, Z_vars)
+  } else if (procedure == "cochrane"){
+      sc_data <- data[-1,]
+        # Turn data into matrices
+      y <- to_matrix(sc_data, y_var)
+      X <- to_matrix(sc_data, X_vars)
+      Z <- to_matrix(sc_data, Z_vars)
+  }
+  
   # Add intercept
   if (intercept == T) X <- cbind(1, X)
   if (intercept == T) Z <- cbind(1, Z)
   # Calculate n and k for degrees of freedom
   t <- nrow(X)
   k <- ncol(X)
-  # Update names
-  #if (intercept == T) rownames(b)[1] <- "Intercept"
 
-  # ESTIMATE RHO
-  if (procedure == "prais")
-      sc_data <- data
-  else if (procedure == "cochrane")
-      sc_data <- data[-1,]
-  
   # Estimate rho for use in FGLS
   rho <- rho_ols(sc_data, y_var, X_vars)
   rho_hat <- rho * (t-k)/(t-1)
   
-  # CREATE LOOP THAT BUILDS C MATRIX (is this the right number of rows/columns??)
+  # CREATE LOOP THAT BUILDS C MATRIX
    G <- matrix(NA, nrow=t, ncol =t)
     for (i in 1:t) {
       for (j in 1:t) {
-        if (j == 1 & i == 1) G[i,j] <- sqrt(1-rho)
-        else if (i == j) G[i,j] <- 1
-        else if (i == j + 1) G[i,j] <- -rho
-        else G[i,j] <- 0
+        if (j == 1 & i == 1) { G[i,j] <- sqrt(1-rho^2)
+        } else if (i == j & i != 1) { G[i,j] <- 1
+        } else if (i == j + 1) { G[i,j] <- -rho
+        } else G[i,j] <- 0
       }
     }
 
@@ -606,8 +547,14 @@ prais <- fgls_sc(
 prais$ttest
 
 newres <- prais$vars$e
+
+(rho_ols(
+  data = gdp_data,
+  y_data = "delta_p",
+  X_data = rhs_vars
+))
 ```
-Most of the signs on the parameter estimates are the same, but the magnitude has changed. Some significance results have changed as well!
+Most of the signs on the parameter estimates are the same, but the magnitude has changed. Some significance results have changed as well! $\hat{\rho}$ is -0.04408.
 
 ``` {r plot PW results}
 # plot(gdp_data$Year, newres)
@@ -616,33 +563,13 @@ ggplot(gdp_data, aes(x=Year, y=newres)) + geom_line()
 
 
 ```
-
-
-
-``` {r test_loop for C matrix, include = FALSE}
-rho <- .3
-t <- 15
-G <- matrix(NA, nrow=t, ncol =t)
-  for (i in 1:t) {
-    for (j in 1:t) {
-      if (j == 1 & i == 1) G[i,j] <- sqrt(1-rho)
-      else if (i == j) G[i,j] <- 1
-      else if (i == j + 1) G[i,j] <- -rho
-      else G[i,j] <- 0
-    }
-  }
-
-
-```
+Doesn't seem to have corrected the problem too much!
 
 ### (h) Cochrane Orcutt procedure
 Use the Cochrane Orcutt procedure to correct for the serial correlation problem. Report parameter estimates, standard errors, t-statistics and a plot of the new residuals against time. 
 _Did dropping the initial observation change the results a lot?_
 
 ``` {r COtest}
-
-# Adjust fgls_sc function above to include an option to omit first observation???
-# ---> I DON'T THINK I DID THIS RIGHT!! PLEASE CHECK :)
 
 # Define covariates (again)
 rhs_vars <- c("yr_qtr", "Realgdp", "Realcons", "Realinvs", "Realgovt", "Realdpi", "CPI_U", "M1", "Tbilrate", "Unemp", "Pop", "Infl", "Realint")
@@ -660,36 +587,29 @@ cochrane <- fgls_sc(
 cochrane$ttest
 
 newres2 <- cochrane$vars$e
-
-# Rerun FGLS
-
-# t-test table
-
 ```
 
-I don't think I dropped the first observation correctly, but at present it doesn't seem to have changed the results dramatically.....
+The value of the coefficients have changed by a small amount. Th ecoefficient on Unemployment is only 0.014 bigger for Cochrane that that of teh Prais Winston method. Overall, the results are not significantly different.
 
 ``` {r plot CO results}
+# plot(gdp_data$Year, newres2)
 
-#plot(gdp_data$Year, newres2)
-
-ggplot(gdp_data, aes(x=Year, y=newres2)) + geom_line()
+ggplot(gdp_data[-1,], aes(x=Year, y=newres2)) + geom_line()
 
 
 ```
+The plot still depicts serial correlation. Thus, maybe we have not fully corrected the problem of autocorrelation.
 
 ### (i) Hildreth Lu procedure
+Use the Hildreth Lu procedure discussed in the notes to correct for serial correlation. (Do a gridsearch for $\rho$ over the interval [-0.95;0.95] using a 0.01 spacing.)
 
 ```{r Hildreth Lu, eval=F}
 
-rho <- 0.4
-data$one <- 1
-
-hildreth_lu <- function(data, y, X1, one, rho) {
+hildreth_lu <- function(data, y_var, X_vars, one, rho) {
 
 #Converting variables to vectors 
-y <- select_(data, y) %>% unlist()
-X1 <- select_(data, X1) %>% unlist()
+y <- select_(data, y_var) %>% unlist()
+X1 <- select_(data, X_vars) %>% unlist()
 one <- select_(data, one) %>% unlist()
 
 #Modifying data based on rho
@@ -732,26 +652,25 @@ k <- ncol(X)
   return(log_L)
 }
 
+rho <- 0.4
+gdp_data$one <- 1
 #Testing for rho = 0.4 before running loop 
-hildreth_lu(data, "y", "unemployment", "one", rho)
+hildreth_lu(gdp_data, "delta_p", "Unemp", "one", rho)
 
 #Defining vector of rho's
 rhos <- seq(-0.95,0.95, by=0.01)
 
 #Running in a loop 
-(LL <- sapply(X = rhos,
+LL <- sapply(X = rhos,
              FUN = hildreth_lu,
-             data = data, y = "y", X1 = "unemployment",
-             one = "one"))
+             data = gdp_data, y_var = "delta_p", X_vars = "Unemp",
+             one = "one")
 
 (rhos[which(LL==max(LL))])
 
 
 ```
-
-
-
-
+Using this method, we calculate the MLE for the log likelihood function and get a rho of -0.43. This is an order of magnitude off from what we got for the Prais-Winston and Cochrane-Orcutt estimate!
 
 
 ###### Notes on Parallelizing
